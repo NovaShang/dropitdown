@@ -77,6 +77,12 @@ find "$APP_BUNDLE" -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || 
 find "$APP_BUNDLE" -name '*.pyc' -delete 2>/dev/null || true
 find "$APP_BUNDLE/Contents/Resources/python/lib" -name 'tests' -type d -exec rm -rf {} + 2>/dev/null || true
 find "$APP_BUNDLE/Contents/Resources/python/lib" -name 'test' -type d -exec rm -rf {} + 2>/dev/null || true
+# speech_recognition ships an ancient pre-10.9-SDK FLAC binary that
+# notarytool rejects. We don't use audio transcription (CU handles that),
+# so it's safe to drop.
+find "$APP_BUNDLE/Contents/Resources/python/lib" -name 'flac-mac' -delete 2>/dev/null || true
+find "$APP_BUNDLE/Contents/Resources/python/lib" -name 'flac-linux*' -delete 2>/dev/null || true
+find "$APP_BUNDLE/Contents/Resources/python/lib" -name 'flac-win32.exe' -delete 2>/dev/null || true
 
 # ----- 8. Report ---------------------------------------------------------
 SIZE=$(du -sh "$APP_BUNDLE" | awk '{print $1}')
