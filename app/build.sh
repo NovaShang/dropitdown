@@ -48,6 +48,17 @@ cp "$APP_DIR/Resources/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
 cp "$SWIFT_BIN" "$APP_BUNDLE/Contents/MacOS/DropItDown"
 chmod +x "$APP_BUNDLE/Contents/MacOS/DropItDown"
 
+# Generate AppIcon.icns from the SVG source if it's missing or older than
+# the source, then copy into the bundle. Info.plist already references
+# `CFBundleIconFile = AppIcon`.
+ICON_SRC="$APP_DIR/Resources/AppIcon.svg"
+ICON_ICNS="$APP_DIR/Resources/AppIcon.icns"
+if [[ ! -f "$ICON_ICNS" || "$ICON_SRC" -nt "$ICON_ICNS" ]]; then
+    log "Rendering AppIcon.icns from SVG"
+    "$APP_DIR/Resources/build-icon.sh" >/dev/null
+fi
+cp "$ICON_ICNS" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
+
 # ----- 4. Extract embedded Python into Resources/python/ -----------------
 log "Extracting embedded Python"
 tar -xzf "$PBS_CACHE" -C "$APP_BUNDLE/Contents/Resources"
@@ -113,7 +124,18 @@ find "$APP_BUNDLE/Contents/Resources/python/lib" -name 'flac-mac' -delete 2>/dev
 find "$APP_BUNDLE/Contents/Resources/python/lib" -name 'flac-linux*' -delete 2>/dev/null || true
 find "$APP_BUNDLE/Contents/Resources/python/lib" -name 'flac-win32.exe' -delete 2>/dev/null || true
 
-# ----- 8. Report ---------------------------------------------------------
+# ----- 8. Ad-hoc sign (skip Developer ID to avoid keychain prompts) -----
+# Keychain access for the Developer ID cert prompts on each codesign call;
+# annoying for the build-install-drop loop. Use ad-hoc instead. The
+# trade-off: macOS asks for Files & Folders permission per fresh bundle.
+# Workaround once: in System Settings → Privacy & Security → Files and
+# Folders (or Full Disk Access), grant /Applications/DropItDown.app access
+# to ~/Documents. macOS keeps the grant for the bundle ID even when the
+# cdhash changes (the grant is tied to bundle path + identifier).
+log "Ad-hoc signing (CI builds use Developer ID separately)"
+codesign --force --deep --sign - "$APP_BUNDLE" 2>&1 | tail -2 || true
+
+# ----- 9. Report ---------------------------------------------------------
 SIZE=$(du -sh "$APP_BUNDLE" | awk '{print $1}')
 log "Built $APP_BUNDLE ($SIZE)"
 echo "Launch with: open '$APP_BUNDLE'"

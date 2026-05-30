@@ -50,6 +50,10 @@ final class PythonRunner: Sendable {
 
     private func makeProcess(args: [String]) -> Process {
         let p = Process()
+        // Drop-launched .app processes inherit a low QoS that throttles the
+        // async pollers inside Azure SDK clients (CU long-polls a job ID).
+        // Force user-interactive so timer/IO scheduling stays responsive.
+        p.qualityOfService = .userInitiated
         let cli = cliPath()
         if cli.hasSuffix("/env") {
             p.executableURL = URL(fileURLWithPath: cli)

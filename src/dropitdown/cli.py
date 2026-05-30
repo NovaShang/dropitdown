@@ -305,6 +305,98 @@ def open_md(record_id: int) -> None:
     subprocess.run(["open", str(path)], check=False)
 
 
+config_app = typer.Typer(help="Inspect / edit configuration.")
+app.add_typer(config_app, name="config")
+
+
+@config_app.command("show")
+def config_show(
+    json_out: bool = typer.Option(False, "--json", help="Emit as JSON (for the Swift UI)."),
+) -> None:
+    """Print current resolved config."""
+    cfg = _load_config_or_die()
+    if json_out:
+        payload = {
+            "inbox": str(cfg.inbox),
+            "archive_root": str(cfg.archive_root),
+            "md_root": str(cfg.md_root),
+            "classification_mode": cfg.classification_mode,
+            "model": cfg.model,
+            "base_url": cfg.base_url,
+            "proxy_url": cfg.proxy_url,
+            "device_id": cfg.device_id,
+            "has_api_key": bool(cfg.api_key) and cfg.classification_mode == "byok",
+            "max_content_chars": cfg.max_content_chars,
+            "cu_endpoint": cfg.cu_endpoint,
+            "cu_analyzer_id": cfg.cu_analyzer_id,
+            "cu_file_types": cfg.cu_file_types,
+            "has_cu_key": bool(cfg.cu_api_key),
+        }
+        sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
+        return
+    console.print(f"  inbox        {cfg.inbox}")
+    console.print(f"  archive      {cfg.archive_root}")
+    console.print(f"  md           {cfg.md_root}")
+    console.print(f"  mode         {cfg.classification_mode}")
+    if cfg.classification_mode == "hosted":
+        console.print(f"  proxy        {cfg.proxy_url}")
+        console.print(f"  device       {cfg.device_id[:12]}…")
+    else:
+        console.print(f"  model        {cfg.model} @ {cfg.base_url}")
+
+
+@config_app.command("set")
+def config_set(
+    key: str = typer.Argument(..., help="Top-level config key (e.g. archive_root, model)."),
+    value: str = typer.Argument(..., help="New value."),
+) -> None:
+    """Set a single config value. Writes config.toml in place."""
+    import tomllib
+
+    if not CONFIG_PATH.exists():
+        console.print(f"[red]No config at {CONFIG_PATH}[/red]")
+        raise typer.Exit(1)
+    with CONFIG_PATH.open("rb") as f:
+        data = tomllib.load(f)
+
+    # Coerce the incoming string to the right TOML type for known keys, so
+    # the Swift settings UI can set list/int values without corrupting them.
+    list_keys = {"cu_file_types"}
+    int_keys = {"max_content_chars"}
+    if key in list_keys:
+        data[key] = [
+            part.strip().lstrip(".").lower()
+            for part in value.split(",")
+            if part.strip()
+        ]
+    elif key in int_keys:
+        try:
+            data[key] = int(value)
+        except ValueError:
+            console.print(f"[red]{key} must be an integer[/red]")
+            raise typer.Exit(1)
+    elif value == "" and key in data:
+        # Empty string clears the key entirely (used to unset api keys).
+        del data[key]
+    else:
+        data[key] = value
+    # Re-emit as TOML (simple key=value layout, ASCII-safe escaping for strings).
+    lines: list[str] = []
+    for k, v in data.items():
+        if isinstance(v, str):
+            escaped = v.replace("\\", "\\\\").replace('"', '\\"')
+            lines.append(f'{k} = "{escaped}"')
+        elif isinstance(v, bool):
+            lines.append(f"{k} = {str(v).lower()}")
+        elif isinstance(v, (int, float)):
+            lines.append(f"{k} = {v}")
+        elif isinstance(v, list):
+            items = ", ".join(f'"{x}"' for x in v)
+            lines.append(f"{k} = [{items}]")
+    CONFIG_PATH.write_text("\n".join(lines) + "\n")
+    console.print(f"[green]✓[/green] {key} = {value}")
+
+
 @app.command()
 def status() -> None:
     """Show config and recent activity."""

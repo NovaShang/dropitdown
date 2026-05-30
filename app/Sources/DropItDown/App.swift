@@ -5,15 +5,42 @@ struct DropItDownApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
 
     var body: some Scene {
-        // Main window opens on user-driven launch (double-click in Finder,
-        // or when the app is already running and the user clicks the Dock
-        // icon). Drop-on-Dock launches do not surface this window — see
-        // AppDelegate.applicationOpenUntitledFile.
-        WindowGroup("DropItDown", id: "main") {
-            ContentView()
+        WindowGroup(id: "main") {
+            RootView()
                 .environmentObject(delegate.history)
-                .frame(minWidth: 720, minHeight: 480)
+                .environmentObject(delegate.config)
+                .frame(minWidth: 900, minHeight: 600)
+                .navigationTitle("")
         }
         .windowToolbarStyle(.unifiedCompact)
+        .windowResizability(.contentSize)
+        .defaultSize(width: 1180, height: 740)
+        .commands {
+            CommandGroup(replacing: .newItem) {}
+        }
+
+        Settings {
+            PreferencesView()
+                .environmentObject(delegate.config)
+        }
+    }
+}
+
+/// Multi-tab preferences window (Cmd+,). Bundles classification config
+/// with the ignore-pattern list and the LLM-learned rules — those are
+/// configuration concerns, not main navigation.
+struct PreferencesView: View {
+    @EnvironmentObject var config: ConfigStore
+
+    var body: some View {
+        TabView {
+            SettingsView()
+                .tabItem { Label("General", systemImage: "gear") }
+            IgnoreView()
+                .tabItem { Label("Ignore", systemImage: "line.3.horizontal.decrease") }
+            RulesView()
+                .tabItem { Label("Rules", systemImage: "checkmark.shield") }
+        }
+        .frame(width: 640, height: 620)
     }
 }
