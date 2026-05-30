@@ -1,28 +1,17 @@
 import SwiftUI
+import MarkdownUI
 
-/// Render a markdown body with the YAML front-matter stripped. Falls back
-/// to plain text for content the system parser can't handle.
+/// Render a markdown note (front-matter stripped) using MarkdownUI — a
+/// mature CommonMark/GFM renderer. Replaces the old AttributedString path,
+/// which only handled inline styling (no headings/lists/code/tables) and
+/// bogged down on longer notes.
 struct MarkdownText: View {
     let content: String
 
     var body: some View {
-        let body = MarkdownText.stripFrontmatter(content)
-        if let attr = try? AttributedString(
-            markdown: body,
-            options: .init(
-                allowsExtendedAttributes: false,
-                interpretedSyntax: .inlineOnlyPreservingWhitespace,
-                failurePolicy: .returnPartiallyParsedIfPossible
-            )
-        ) {
-            Text(attr)
-                .font(.body)
-                .textSelection(.enabled)
-        } else {
-            Text(body)
-                .font(.body.monospaced())
-                .textSelection(.enabled)
-        }
+        Markdown(MarkdownText.stripFrontmatter(content))
+            .markdownTheme(.dropItDown)
+            .textSelection(.enabled)
     }
 
     /// Drop the leading `---\nkey: value\n...\n---\n` block, if present.
@@ -39,4 +28,21 @@ struct MarkdownText: View {
             .joined(separator: "\n")
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
+}
+
+extension Theme {
+    /// GitHub theme tuned to the app: 15pt body, accent-coloured links, and
+    /// a softer inline-code background so it reads well in the Notes pane.
+    static let dropItDown = Theme.gitHub
+        .text {
+            FontSize(15)
+        }
+        .link {
+            ForegroundColor(.accentColor)
+        }
+        .code {
+            FontFamilyVariant(.monospaced)
+            FontSize(.em(0.88))
+            BackgroundColor(Color.secondary.opacity(0.12))
+        }
 }
