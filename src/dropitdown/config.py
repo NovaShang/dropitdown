@@ -15,7 +15,7 @@ DEVICE_ID_PATH = APP_SUPPORT_DIR / "device_id"
 
 # Default hosted proxy URL — when no api_key is configured, the app talks
 # here using a per-device token. The proxy is OpenAI-compatible.
-DEFAULT_PROXY_URL = "https://api.dropitdown.app"
+DEFAULT_PROXY_URL = "https://dropitdown-proxy.styleshang.workers.dev"
 
 # Legacy paths from the early CLI days; migrated on first run.
 _LEGACY_CONFIG_DIR = Path(os.path.expanduser("~/.config/dropitdown"))

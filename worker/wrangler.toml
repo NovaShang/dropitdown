@@ -8,7 +8,7 @@ compatibility_flags = ["nodejs_compat"]
 # Then paste the returned id below.
 [[kv_namespaces]]
 binding = "QUOTA"
-id = "REPLACE_WITH_KV_NAMESPACE_ID"
+id = "32f5db375a374e319a50d7f48e83a2cf"
 
 # DeepSeek API key — set with: wrangler secret put DEEPSEEK_API_KEY
 # Default quota (calls per device per month).
