@@ -70,7 +70,7 @@ wrangler secret put DEEPSEEK_API_KEY
 wrangler deploy
 ```
 
-Then point the app at it by updating `DEFAULT_PROXY_URL` in `src/dropitdown/config.py`.
+Currently deployed at https://dropitdown-proxy.styleshang.workers.dev (referenced from `DEFAULT_PROXY_URL` in `src/dropitdown/config.py`).
 
 ## Use the CLI directly
 
