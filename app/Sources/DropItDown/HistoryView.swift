@@ -3,8 +3,8 @@ import AppKit
 
 struct HistoryView: View {
     @EnvironmentObject var history: HistoryStore
+    @Binding var searchText: String
     @State private var selectedID: HistoryEntry.ID?
-    @State private var searchText: String = ""
     @State private var fixingEntry: HistoryEntry?
 
     private var filteredEntries: [HistoryEntry] {
@@ -29,7 +29,6 @@ struct HistoryView: View {
                 selectedID = first.id
             }
         }
-        .searchable(text: $searchText, placement: .toolbar, prompt: "Search history")
         .sheet(item: $fixingEntry) { entry in
             FixSheet(entry: entry) { note in
                 Task {
