@@ -47,9 +47,14 @@ cat > "$ENTITLEMENTS" << 'EOF'
 EOF
 
 log "Signing embedded binaries"
-# Sign everything inside Resources/python first (innermost first).
-find "$APP_BUNDLE/Contents/Resources/python" \
-    \( -name '*.so' -o -name '*.dylib' -o -name 'python3*' \) \
+# Sign every native binary inside Resources/python — .so / .dylib anywhere,
+# and the actual Python interpreters in bin/. Filter to regular files only
+# so we don't try to codesign include/python3.13 (a header directory).
+PY_ROOT="$APP_BUNDLE/Contents/Resources/python"
+find "$PY_ROOT" -type f \( -name '*.so' -o -name '*.dylib' \) \
+    -exec codesign --force --options runtime --timestamp \
+        --sign "$APPLE_DEV_ID" --entitlements "$ENTITLEMENTS" {} +
+find "$PY_ROOT/bin" -type f -perm +111 -name 'python3*' \
     -exec codesign --force --options runtime --timestamp \
         --sign "$APPLE_DEV_ID" --entitlements "$ENTITLEMENTS" {} +
 
