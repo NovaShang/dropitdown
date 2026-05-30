@@ -60,9 +60,11 @@ ln -sf python3 "$APP_BUNDLE/Contents/Resources/python/bin/python" 2>/dev/null ||
 
 # ----- 5. Install project + deps into the embedded Python ---------------
 log "Installing project + deps into embedded Python"
-# uv pip install --python <embedded_python> -e <project>
+# Non-editable install: copies dropitdown into site-packages so the bundle
+# is fully self-contained (editable installs only drop a pointer back to
+# the source dir, which doesn't exist on the user's machine).
 # `--no-cache` avoids polluting the user's uv cache with these wheels.
-uv pip install --python "$PY_BIN" --no-cache --prerelease=allow -e "$PROJ_ROOT"
+uv pip install --python "$PY_BIN" --no-cache --prerelease=allow "$PROJ_ROOT"
 
 # ----- 6. Drop the dropitdown launcher script ---------------------------
 # `uv pip install` writes the entry-point script with an absolute shebang
