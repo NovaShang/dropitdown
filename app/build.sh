@@ -65,11 +65,38 @@ log "Installing project + deps into embedded Python"
 uv pip install --python "$PY_BIN" --no-cache --prerelease=allow -e "$PROJ_ROOT"
 
 # ----- 6. Drop the dropitdown launcher script ---------------------------
-# The pip install will have placed a `dropitdown` script in the embedded
-# bin/ directory pointing at the embedded python. Verify and make sure
-# its shebang is portable enough for codesign + notarize.
-test -f "$APP_BUNDLE/Contents/Resources/python/bin/dropitdown" || {
-    echo "dropitdown launcher missing"; exit 1; }
+# `uv pip install` writes the entry-point script with an absolute shebang
+# pointing at whatever Python was used at build time. On CI that's a path
+# inside the runner's workspace, which doesn't exist on a user's Mac — so
+# we replace it with a portable shell wrapper that resolves the bundled
+# python3 relative to itself.
+PY_BIN_DIR="$APP_BUNDLE/Contents/Resources/python/bin"
+test -f "$PY_BIN_DIR/dropitdown" || { echo "dropitdown launcher missing"; exit 1; }
+
+cat > "$PY_BIN_DIR/dropitdown" << 'EOF'
+#!/bin/sh
+# Portable launcher: works wherever the .app bundle is moved.
+HERE="$(cd "$(dirname "$0")" && pwd)"
+exec "$HERE/python3" -m dropitdown "$@"
+EOF
+chmod +x "$PY_BIN_DIR/dropitdown"
+
+# Same fix for any other pip-generated entry point scripts (magika etc.).
+# They all share the same broken shebang.
+for script in "$PY_BIN_DIR"/*; do
+    [ -f "$script" ] || continue
+    case "$script" in
+        */python*|*/pip*|*/dropitdown) continue ;;
+    esac
+    head -1 "$script" 2>/dev/null | grep -q "/Users/runner/" || continue
+    name=$(basename "$script")
+    cat > "$script" << EOF
+#!/bin/sh
+HERE="\$(cd "\$(dirname "\$0")" && pwd)"
+exec "\$HERE/python3" -m $name "\$@"
+EOF
+    chmod +x "$script"
+done
 
 # ----- 7. Strip cruft to slim the bundle --------------------------------
 log "Slimming bundle"
