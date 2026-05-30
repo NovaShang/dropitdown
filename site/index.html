@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DropItDown — Drop a file. AI files it away.</title>
+    <meta name="description" content="Drag any file onto the Dock icon. DropItDown converts it, classifies it, and files it into your archive. Native macOS app with use-once-and-die lifecycle.">
+    <meta property="og:title" content="DropItDown — Drop a file. AI files it away.">
+    <meta property="og:description" content="A drop-and-forget archivist for your Mac. Originals organized, Markdown notes written, brain freed.">
+    <meta property="og:image" content="/og.png">
+    <meta property="og:type" content="website">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <meta name="theme-color" content="#0f1620">
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <nav class="nav">
+        <div class="nav-inner">
+            <a href="#top" class="brand">
+                <img src="/favicon.svg" width="28" height="28" alt="">
+                <span>DropItDown</span>
+            </a>
+            <div class="nav-links">
+                <a href="#how">How it works</a>
+                <a href="#features">Features</a>
+                <a href="#pricing">Pricing</a>
+                <a href="https://github.com/NovaShang/dropitdown" target="_blank" rel="noopener">GitHub</a>
+            </div>
+            <a href="#download" class="btn btn-primary btn-sm">Download</a>
+        </div>
+    </nav>
+
+    <header id="top" class="hero">
+        <div class="hero-glow"></div>
+        <div class="container">
+            <div class="hero-inner">
+                <span class="eyebrow">macOS 14 Sonoma+</span>
+                <h1>Drop a file.<br><span class="accent">AI files it away.</span></h1>
+                <p class="lead">
+                    Drag anything onto the Dock icon. DropItDown converts it, classifies it,
+                    moves it into your archive, and writes a Markdown note pointing back —
+                    so future-you can find it.
+                </p>
+                <div class="cta-row">
+                    <a href="#download" class="btn btn-primary">
+                        <svg width="16" height="16" viewBox="0 0 384 512" fill="currentColor"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>
+                        Download for Mac
+                    </a>
+                    <a href="https://github.com/NovaShang/dropitdown" target="_blank" rel="noopener" class="btn btn-ghost">
+                        View on GitHub
+                    </a>
+                </div>
+                <p class="hero-meta">Free monthly quota · No account required · ~250 MB</p>
+            </div>
+
+            <div class="hero-art">
+                <div class="hero-card">
+                    <div class="hero-card-body">
+                        <div class="paper" aria-hidden="true">
+                            <div class="paper-corner"></div>
+                            <div class="paper-line"></div>
+                            <div class="paper-line short"></div>
+                            <div class="paper-line"></div>
+                        </div>
+                        <div class="funnel" aria-hidden="true">
+                            <svg viewBox="0 0 240 200" width="100%" height="100%">
+                                <defs>
+                                    <linearGradient id="fnGrad" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="0" stop-color="#5cf0b6"/>
+                                        <stop offset=".55" stop-color="#2fd595"/>
+                                        <stop offset="1" stop-color="#12a877"/>
+                                    </linearGradient>
+                                </defs>
+                                <path d="M16 32 H224 L155 112 V160 L85 200 V112 Z" fill="url(#fnGrad)"/>
+                                <ellipse cx="120" cy="32" rx="104" ry="14" fill="#76f5c4"/>
+                            </svg>
+                        </div>
+                        <div class="result-list">
+                            <div class="result-row">
+                                <span class="check">✓</span>
+                                <span class="result-bar w1"></span>
+                            </div>
+                            <div class="result-row">
+                                <span class="check">✓</span>
+                                <span class="result-bar w2"></span>
+                            </div>
+                            <div class="result-row">
+                                <span class="check dim">✓</span>
+                                <span class="result-bar w3 dim"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <section id="how" class="section">
+        <div class="container">
+            <h2>How it works</h2>
+            <p class="section-lead">Three steps, then the app quits. Until the next drop.</p>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-num">1</div>
+                    <h3>Drop</h3>
+                    <p>Drag a file from anywhere onto the DropItDown icon in your Dock. The app wakes only for this.</p>
+                </div>
+                <div class="step">
+                    <div class="step-num">2</div>
+                    <h3>Read &amp; classify</h3>
+                    <p>Azure Content Understanding extracts the text. A language model reads it, picks a category from your existing folder structure (or invents a new one).</p>
+                </div>
+                <div class="step">
+                    <div class="step-num">3</div>
+                    <h3>File &amp; note</h3>
+                    <p>The original moves to <code>Archive/&lt;category&gt;/</code>. A Markdown note is written alongside, with a link back to the original. Done — app exits.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="features" class="section section-alt">
+        <div class="container">
+            <h2>Why it&rsquo;s built this way</h2>
+            <div class="feature-grid">
+                <div class="feature">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Use-once-and-die</h3>
+                    <p>No background process. No menu bar. No watchdog daemon. The .app wakes for a drop, processes, exits.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🦾</div>
+                    <h3>Native, not Electron</h3>
+                    <p>SwiftUI binary, Apple-signed and notarized, ~95 MB on disk plus an embedded Python pipeline for the heavy lifting.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">📝</div>
+                    <h3>Markdown by default</h3>
+                    <p>Every archived file gets a paired <code>.md</code> note with YAML frontmatter linking back to the original. Search your archive with your favorite editor.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🧠</div>
+                    <h3>Learns from your fixes</h3>
+                    <p>Got a wrong archive? Tell it where it should have gone. The rule gets recorded so the same mistake doesn&rsquo;t recur.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🏠</div>
+                    <h3>Files stay on your Mac</h3>
+                    <p>The archive lives in <code>~/Documents</code> (or wherever you point it). Only a short content excerpt is sent for classification.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🔌</div>
+                    <h3>BYOK ready</h3>
+                    <p>The free tier uses a hosted DeepSeek proxy. Power users plug in their own OpenAI, Claude, or DeepSeek key.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="ui" class="section">
+        <div class="container">
+            <h2>Browse what you&rsquo;ve filed</h2>
+            <p class="section-lead">Double-click the icon to open the main window. Two tabs, that&rsquo;s it.</p>
+            <div class="screenshot-wrap">
+                <div class="screenshot-frame">
+                    <img src="/screenshot-main.png" alt="DropItDown main window with file history" loading="lazy">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="pricing" class="section section-alt">
+        <div class="container">
+            <h2>Two ways to run it</h2>
+            <div class="pricing-grid">
+                <div class="plan">
+                    <div class="plan-tag">Default</div>
+                    <h3>Hosted</h3>
+                    <p class="plan-price">Free <span>· 200 classifications / month</span></p>
+                    <ul class="plan-list">
+                        <li>Zero configuration — install and drop</li>
+                        <li>Runs through a managed DeepSeek proxy</li>
+                        <li>Quota resets every month</li>
+                        <li>Per-device token, no signup required</li>
+                    </ul>
+                </div>
+                <div class="plan plan-featured">
+                    <div class="plan-tag">For power users</div>
+                    <h3>BYOK</h3>
+                    <p class="plan-price">Pay your model provider <span>· no app fee</span></p>
+                    <ul class="plan-list">
+                        <li>Plug in DeepSeek, OpenAI, Claude, or any OpenAI-compatible endpoint</li>
+                        <li>Unlimited classifications (within your provider quota)</li>
+                        <li>Optional: Azure Content Understanding for premium OCR / audio / video</li>
+                        <li>Configured per-key in Settings</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="download" class="section section-cta">
+        <div class="container container-narrow">
+            <h2>Get DropItDown</h2>
+            <p class="section-lead">macOS 14 Sonoma or newer. Apple Silicon required.</p>
+            <div class="cta-buttons">
+                <a href="https://github.com/NovaShang/dropitdown/releases/latest/download/DropItDown-v0.1.3.dmg" class="btn btn-primary btn-large">
+                    Download .dmg
+                </a>
+                <a href="https://github.com/NovaShang/dropitdown/releases" target="_blank" rel="noopener" class="btn btn-ghost">
+                    All releases
+                </a>
+            </div>
+            <p class="fine-print">
+                Signed with Developer ID, notarized by Apple, open source on
+                <a href="https://github.com/NovaShang/dropitdown" target="_blank" rel="noopener">GitHub</a>.
+            </p>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-inner">
+                <div class="footer-brand">
+                    <img src="/favicon.svg" width="32" height="32" alt="">
+                    <span>DropItDown</span>
+                </div>
+                <div class="footer-links">
+                    <a href="https://github.com/NovaShang/dropitdown" target="_blank" rel="noopener">Source</a>
+                    <a href="https://github.com/NovaShang/dropitdown/issues" target="_blank" rel="noopener">Report a bug</a>
+                    <a href="#pricing">Pricing</a>
+                </div>
+                <p class="copyright">© 2026 DropItDown</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

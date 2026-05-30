@@ -1,0 +1,70 @@
+<svg width="1024" height="1024" viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1b2330"/><stop offset="1" stop-color="#0f1620"/>
+    </linearGradient>
+    <radialGradient id="bgGlow" cx="50%" cy="30%" r="70%">
+      <stop offset="0" stop-color="#2a3a4f" stop-opacity=".9"/><stop offset="1" stop-color="#2a3a4f" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="fn" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5cf0b6"/><stop offset="0.55" stop-color="#2fd595"/><stop offset="1" stop-color="#12a877"/>
+    </linearGradient>
+    <linearGradient id="fnEdge" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".55"/><stop offset=".15" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset=".85" stop-color="#000000" stop-opacity="0"/><stop offset="1" stop-color="#0a7a55" stop-opacity=".4"/>
+    </linearGradient>
+    <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e3e9f2"/>
+    </linearGradient>
+    <radialGradient id="mouthGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#4ff0b4" stop-opacity=".55"/><stop offset="1" stop-color="#4ff0b4" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="softShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#000" flood-opacity=".3"/>
+    </filter>
+    <clipPath id="round"><rect width="240" height="240" rx="52"/></clipPath>
+  </defs>
+
+  <g clip-path="url(#round)">
+    <rect width="240" height="240" fill="url(#bg)"/>
+    <rect width="240" height="240" fill="url(#bgGlow)"/>
+
+    <!-- messy tilted file -->
+    <g transform="translate(120 48) rotate(-14)" filter="url(#softShadow)">
+      <rect x="-29" y="-25" width="58" height="50" rx="9" fill="url(#paper)"/>
+      <path d="M15 -25 H29 V -11 Z" fill="#c4cfde"/>
+      <path d="M15 -25 H29 L15 -11 Z" fill="#dfe6f0"/>
+      <path d="M-18 -10 q7 -6 13 -1 t11 1" stroke="#8fa0bb" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+      <path d="M-18 -1 q9 5 15 -1 t9 2" stroke="#aab6cc" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+      <path d="M-18 9 q6 -4 12 0" stroke="#c2ccdb" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+    </g>
+
+    <ellipse cx="120" cy="100" rx="66" ry="20" fill="url(#mouthGlow)"/>
+
+    <!-- funnel -->
+    <g filter="url(#softShadow)">
+      <path d="M56 94 H184 L141 142 V168 L99 188 V142 Z" fill="url(#fn)"/>
+      <path d="M56 94 H184 L141 142 V168 L99 188 V142 Z" fill="url(#fnEdge)"/>
+      <ellipse cx="120" cy="94" rx="64" ry="9" fill="#76f5c4" opacity=".9"/>
+      <ellipse cx="120" cy="93" rx="50" ry="5" fill="#0f3d2e" opacity=".35"/>
+    </g>
+
+    <!-- structured checklist output -->
+    <g transform="translate(120 200)">
+      <g>
+        <circle cx="-34" cy="0" r="4.5" fill="#5cf0b6"/>
+        <path d="M-36 0 l1.6 1.8 L-31.6 -2" stroke="#0f1620" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        <rect x="-24" y="-3.5" width="58" height="7" rx="3.5" fill="#eef3fb"/>
+      </g>
+      <g transform="translate(0 14)">
+        <circle cx="-34" cy="0" r="4.5" fill="#5cf0b6" opacity=".75"/>
+        <path d="M-36 0 l1.6 1.8 L-31.6 -2" stroke="#0f1620" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".8"/>
+        <rect x="-24" y="-3.5" width="44" height="7" rx="3.5" fill="#eef3fb" opacity=".82"/>
+      </g>
+      <g transform="translate(0 28)">
+        <circle cx="-34" cy="0" r="4.5" fill="#5cf0b6" opacity=".5"/>
+        <rect x="-24" y="-3.5" width="52" height="7" rx="3.5" fill="#eef3fb" opacity=".6"/>
+      </g>
+    </g>
+  </g>
+</svg>
