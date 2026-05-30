@@ -252,7 +252,7 @@ private struct HistoryDetailView: View {
             Label("Note preview", systemImage: "doc.text.below.ecg")
                 .font(.headline)
                 .foregroundStyle(.secondary)
-            MarkdownText(content: mdContent)
+            MarkdownText(content: mdContent, maxCharacters: 4000)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(14)
                 .background(.quaternary.opacity(0.3))

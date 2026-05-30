@@ -7,9 +7,22 @@ import MarkdownUI
 /// bogged down on longer notes.
 struct MarkdownText: View {
     let content: String
+    /// Hard cap on characters fed to MarkdownUI. MarkdownUI renders a
+    /// paragraph as a deep `Text + Text + …` concatenation, and SwiftUI's
+    /// resolver recurses per node — a few thousand inline runs overflow the
+    /// main-thread stack. Callers that can't guarantee a small note (e.g.
+    /// the History preview card) pass a cap; oversized input is truncated
+    /// with an ellipsis. `nil` means the caller already bounded the size.
+    var maxCharacters: Int? = nil
 
     var body: some View {
-        Markdown(MarkdownText.stripFrontmatter(content))
+        var body = MarkdownText.stripFrontmatter(content)
+        var truncated = false
+        if let cap = maxCharacters, body.count > cap {
+            body = String(body.prefix(cap))
+            truncated = true
+        }
+        return Markdown(truncated ? body + "\n\n…" : body)
             .markdownTheme(.dropItDown)
             .textSelection(.enabled)
     }

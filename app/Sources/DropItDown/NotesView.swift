@@ -47,23 +47,30 @@ struct NotesView: View {
     @ViewBuilder
     private var preview: some View {
         if let url = selected {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Image(systemName: "doc.text")
-                            .foregroundStyle(.tint)
-                        Text(url.lastPathComponent).font(.title2.weight(.semibold))
-                        Spacer()
+            // Header stays fixed; the body owns its own scrolling so we can
+            // swap in a TextKit view for heavy notes without nesting scrolls.
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "doc.text")
+                        .foregroundStyle(.tint)
+                    Text(url.lastPathComponent).font(.title2.weight(.semibold))
+                    Spacer()
+                    Button {
+                        NSWorkspace.shared.open(url)
+                    } label: {
+                        Label("Open", systemImage: "arrow.up.forward.app")
                     }
-                    Text(url.deletingLastPathComponent().path)
-                        .font(.caption.monospaced())
-                        .foregroundStyle(.tertiary)
-                    Divider()
-                    MarkdownText(content: noteText)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    .controlSize(.small)
+                    .help("Open in your default editor")
                 }
-                .padding(20)
+                Text(url.deletingLastPathComponent().path)
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.tertiary)
+                Divider()
+                NoteReader(content: noteText)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             }
+            .padding(20)
             .background(.background)
         } else {
             PlaceholderView(systemImage: "sidebar.right",
@@ -75,6 +82,67 @@ struct NotesView: View {
     private func loadNote(url: URL?) {
         guard let url = url else { noteText = ""; return }
         noteText = (try? String(contentsOf: url, encoding: .utf8)) ?? "(could not read)"
+    }
+}
+
+/// Renders a note's body, picking the safe renderer for its size. Small
+/// notes get pretty MarkdownUI in a SwiftUI ScrollView; large notes (PDF
+/// dumps can be hundreds of KB) get a TextKit `NSTextView`, which renders
+/// arbitrarily long text without the deep `Text` concatenation that
+/// overflows the stack in MarkdownUI.
+private struct NoteReader: View {
+    let content: String
+
+    var body: some View {
+        let stripped = MarkdownText.stripFrontmatter(content)
+        if NoteReader.isHeavy(stripped) {
+            PlainNoteText(text: stripped)
+        } else {
+            ScrollView {
+                MarkdownText(content: content)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.trailing, 4)
+            }
+        }
+    }
+
+    /// Conservative ceiling well under MarkdownUI's stack-overflow point.
+    /// Either a large byte count or many lines (which become many
+    /// concatenated `Text` nodes within a paragraph) trips the fallback.
+    static func isHeavy(_ body: String) -> Bool {
+        if body.utf16.count > 16_000 { return true }
+        var newlines = 0
+        for ch in body where ch == "\n" {
+            newlines += 1
+            if newlines > 700 { return true }
+        }
+        return false
+    }
+}
+
+/// Read-only, selectable TextKit view for large notes. NSTextView streams
+/// huge documents efficiently and scrolls itself.
+private struct PlainNoteText: NSViewRepresentable {
+    let text: String
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scroll = NSTextView.scrollableTextView()
+        scroll.drawsBackground = false
+        if let tv = scroll.documentView as? NSTextView {
+            tv.isEditable = false
+            tv.isSelectable = true
+            tv.drawsBackground = false
+            tv.textContainerInset = NSSize(width: 0, height: 4)
+            tv.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+            tv.string = text
+        }
+        return scroll
+    }
+
+    func updateNSView(_ scroll: NSScrollView, context: Context) {
+        guard let tv = scroll.documentView as? NSTextView, tv.string != text else { return }
+        tv.string = text
+        tv.scroll(.zero)
     }
 }
 
