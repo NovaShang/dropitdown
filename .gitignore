@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+build/
+dist/
+
+# Swift
+app/.build/
+.swiftpm/
+*.xcodeproj/xcuserdata/
+
+# Worker
+worker/node_modules/
+worker/.wrangler/
+worker/wrangler.toml.local
+
+# Tooling state
+.DS_Store
+tmp/
+
+# Local secrets / overrides
+.env
+.env.local
+*.p12

@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dropitdown"
+version = "0.1.0"
+description = "Drop a file, MarkItDown + LLM file your stuff away."
+requires-python = ">=3.11"
+dependencies = [
+    "markitdown[all,az-content-understanding]>=0.1.6",
+    "watchdog>=4.0",
+    "openai>=1.50",
+    "typer>=0.12",
+    "rich>=13.7",
+    "ocrmac>=1.0",
+]
+
+[project.scripts]
+dropitdown = "dropitdown.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dropitdown"]
