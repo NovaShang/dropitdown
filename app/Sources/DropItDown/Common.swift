@@ -1,6 +1,58 @@
 import SwiftUI
 import AppKit
 
+/// A two-pane master/detail split with an explicitly-controlled sidebar
+/// width. Unlike `HSplitView`, the divider position is plain `@State` (here a
+/// persisted binding): it changes *only* when the user drags the divider —
+/// never when the panes rebuild on selection, search, or tab switch, which is
+/// what made HSplitView's left column jump around. The detail pane absorbs
+/// window resizing; the sidebar stays put.
+struct SidebarSplit<Sidebar: View, Detail: View>: View {
+    @Binding var width: Double
+    var minWidth: Double = 280
+    var maxWidth: Double = 600
+    @ViewBuilder var sidebar: () -> Sidebar
+    @ViewBuilder var detail: () -> Detail
+
+    @State private var dragStart: Double?
+
+    var body: some View {
+        HStack(spacing: 0) {
+            sidebar()
+                .frame(width: width)
+                .frame(maxHeight: .infinity)
+            divider
+            detail()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    private var divider: some View {
+        Rectangle()
+            .fill(Color(nsColor: .separatorColor))
+            .frame(width: 1)
+            .frame(maxHeight: .infinity)
+            .overlay {
+                Rectangle()
+                    .fill(.clear)
+                    .frame(width: 11)
+                    .contentShape(Rectangle())
+                    .onHover { inside in
+                        if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() }
+                    }
+                    .gesture(
+                        DragGesture(minimumDistance: 1)
+                            .onChanged { value in
+                                let start = dragStart ?? width
+                                if dragStart == nil { dragStart = width }
+                                width = min(max(minWidth, start + value.translation.width), maxWidth)
+                            }
+                            .onEnded { _ in dragStart = nil }
+                    )
+            }
+    }
+}
+
 /// Bridges a SwiftUI view to its hosting `NSWindow`. Used so the AppDelegate
 /// can identify and control the WindowGroup's main window (show/hide/observe)
 /// without guessing among `NSApp.windows`.

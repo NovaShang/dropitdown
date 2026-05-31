@@ -17,12 +17,13 @@ struct HistoryView: View {
         }
     }
 
+    @AppStorage("history.sidebarWidth") private var sidebarWidth = 380.0
+
     var body: some View {
-        HSplitView {
+        SidebarSplit(width: $sidebarWidth, minWidth: 300, maxWidth: 520) {
             list
-                .frame(minWidth: 360, idealWidth: 420)
+        } detail: {
             detail
-                .frame(minWidth: 380)
         }
         .onChange(of: history.entries) { _, entries in
             if selectedID == nil, let first = entries.first {

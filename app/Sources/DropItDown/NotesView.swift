@@ -5,16 +5,16 @@ import AppKit
 /// note on the right. Mirrors a stripped-down Obsidian/Bear vibe.
 struct NotesView: View {
     @EnvironmentObject var config: ConfigStore
+    @AppStorage("notes.sidebarWidth") private var sidebarWidth = 260.0
     @State private var rootURL: URL?
     @State private var selected: URL?
     @State private var noteText: String = ""
 
     var body: some View {
-        HSplitView {
+        SidebarSplit(width: $sidebarWidth, minWidth: 200, maxWidth: 460) {
             tree
-                .frame(minWidth: 220, idealWidth: 260)
+        } detail: {
             preview
-                .frame(minWidth: 360)
         }
         .task(id: config.config?.mdRoot) {
             if let path = config.config?.mdRoot {
