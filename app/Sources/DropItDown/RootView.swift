@@ -1,6 +1,17 @@
 import SwiftUI
 import AppKit
 
+/// Open the Settings scene via AppKit. `@Environment(\.openSettings)` only
+/// exists in newer SDKs (it fails to compile against the macOS 14 SDK CI
+/// uses), so go through the responder chain — `showSettingsWindow:` on
+/// macOS 13+, falling back to the old `showPreferencesWindow:` name.
+@MainActor
+func openSettingsWindow() {
+    if !NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil) {
+        NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
+    }
+}
+
 enum Tab: Hashable, CaseIterable {
     case history
     case notes
@@ -23,7 +34,6 @@ enum Tab: Hashable, CaseIterable {
 struct RootView: View {
     @EnvironmentObject var history: HistoryStore
     @EnvironmentObject var config: ConfigStore
-    @Environment(\.openSettings) private var openSettings
     @State private var tab: Tab = .history
     @State private var searchText: String = ""
 
@@ -59,7 +69,7 @@ struct RootView: View {
             // against each other — no stray gap between them.
             ToolbarItemGroup(placement: .primaryAction) {
                 Button {
-                    openSettings()
+                    openSettingsWindow()
                 } label: {
                     Image(systemName: "gearshape")
                 }
