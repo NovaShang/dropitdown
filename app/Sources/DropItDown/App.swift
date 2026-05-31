@@ -11,6 +11,7 @@ struct DropItDownApp: App {
                 .environmentObject(delegate.config)
                 .frame(minWidth: 900, minHeight: 600)
                 .navigationTitle("")
+                .background(WindowAccessor { delegate.registerMainWindow($0) })
         }
         .windowToolbarStyle(.unifiedCompact)
         .windowResizability(.contentSize)

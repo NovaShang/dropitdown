@@ -1,4 +1,26 @@
 import SwiftUI
+import AppKit
+
+/// Bridges a SwiftUI view to its hosting `NSWindow`. Used so the AppDelegate
+/// can identify and control the WindowGroup's main window (show/hide/observe)
+/// without guessing among `NSApp.windows`.
+struct WindowAccessor: NSViewRepresentable {
+    let onResolve: (NSWindow) -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async { [weak view] in
+            if let window = view?.window { onResolve(window) }
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async { [weak nsView] in
+            if let window = nsView?.window { onResolve(window) }
+        }
+    }
+}
 
 /// Universal placeholder for "nothing selected / nothing to show" states.
 struct PlaceholderView: View {
