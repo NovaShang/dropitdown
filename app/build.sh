@@ -48,6 +48,16 @@ cp "$APP_DIR/Resources/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
 cp "$SWIFT_BIN" "$APP_BUNDLE/Contents/MacOS/DropItDown"
 chmod +x "$APP_BUNDLE/Contents/MacOS/DropItDown"
 
+# Stamp the version into the bundled Info.plist. The marketing version is the
+# single source of truth in ../VERSION; the build number is the git commit
+# count so it increases monotonically. A release tag (vX.Y.Z) must match
+# VERSION — release.yml enforces that.
+MARKETING_VERSION="$(tr -d ' \n' < "$PROJ_ROOT/VERSION")"
+BUILD_NUMBER="$(git -C "$PROJ_ROOT" rev-list --count HEAD 2>/dev/null || echo 1)"
+log "Stamping version $MARKETING_VERSION ($BUILD_NUMBER)"
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $MARKETING_VERSION" "$APP_BUNDLE/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$APP_BUNDLE/Contents/Info.plist"
+
 # Generate AppIcon.icns from the SVG source if it's missing or older than
 # the source, then copy into the bundle. Info.plist already references
 # `CFBundleIconFile = AppIcon`.

@@ -13,6 +13,18 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history so build.sh's commit-count build number is stable
+
+      - name: Verify tag matches VERSION
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF##*/}"
+          VERSION="v$(tr -d ' \n' < VERSION)"
+          if [[ "$TAG" != "$VERSION" ]]; then
+            echo "::error::Tag $TAG does not match VERSION file ($VERSION). Bump VERSION or fix the tag."
+            exit 1
+          fi
 
       - uses: actions/setup-python@v5
         with:
@@ -74,20 +86,22 @@ jobs:
           NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
         run: ./sign-and-notarize.sh
 
-      - name: Rename DMG with version tag
+      - name: Name DMG assets
         id: rename
         working-directory: app
         run: |
           TAG="${GITHUB_REF##*/}"
-          DEST=".build/DropItDown-${TAG}.dmg"
-          mv .build/DropItDown.dmg "$DEST"
-          echo "dmg=$DEST" >> "$GITHUB_OUTPUT"
+          # A versioned copy (nice for humans) and a stable copy the landing
+          # page can link to via /releases/latest/download/DropItDown.dmg.
+          cp .build/DropItDown.dmg ".build/DropItDown-${TAG}.dmg"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
-      - name: Create GitHub Release + upload DMG
+      - name: Create GitHub Release + upload DMGs
         uses: softprops/action-gh-release@v2
         with:
           name: DropItDown ${{ steps.rename.outputs.tag }}
           tag_name: ${{ steps.rename.outputs.tag }}
           generate_release_notes: true
-          files: app/${{ steps.rename.outputs.dmg }}
+          files: |
+            app/.build/DropItDown.dmg
+            app/.build/DropItDown-${{ steps.rename.outputs.tag }}.dmg
