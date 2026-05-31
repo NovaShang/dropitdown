@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import OSLog
 import SwiftUI
 import UserNotifications
@@ -26,15 +27,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private var activeTasks = 0
     /// A drop initiated this launch — run headless and quit when done.
     private var launchedViaDrop = false
-    /// The management window is in play (normal launch, or surfaced via the
-    /// Dock). While true, the app stays alive even with no tasks.
-    private var uiEstablished = false
+    /// The management window is up (normal launch, or surfaced via the Dock).
+    /// This is the single source of truth for "is the main window open": the
+    /// app stays alive while it's true, and quits when it goes false with no
+    /// tasks left.
+    private var managementActive = false
     /// The WindowGroup's NSWindow, handed over by `WindowAccessor` in RootView
     /// so we can show/hide it and watch it close — without confusing it for
     /// the Settings window.
     private weak var mainWindow: NSWindow?
 
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        // Take over the open-documents Apple Event *before* AppKit installs
+        // its default handler. AppKit's default not only calls
+        // application(_:open:) but also drives SwiftUI's window machinery,
+        // which closes/cycles the main window on every drop — breaking the
+        // management flow. Handling the event ourselves keeps file opens
+        // entirely decoupled from the window.
+        installOpenDocumentsHandler()
+    }
+
+    private func installOpenDocumentsHandler() {
+        NSAppleEventManager.shared().setEventHandler(
+            self,
+            andSelector: #selector(handleOpenDocuments(_:withReplyEvent:)),
+            forEventClass: AEEventClass(kCoreEventClass),
+            andEventID: AEEventID(kAEOpenDocuments)
+        )
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Re-assert our handler in case AppKit replaced it during launch.
+        installOpenDocumentsHandler()
+
         let center = UNUserNotificationCenter.current()
         center.delegate = self
         center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
@@ -45,38 +70,54 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             name: NSWindow.willCloseNotification,
             object: nil
         )
-
-        // A drop is delivered during launch (before this runloop turn ends),
-        // so by the next turn we know whether this was a plain launch. If it
-        // wasn't a drop, the window SwiftUI already showed is the management
-        // window and should stay.
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            if !self.launchedViaDrop {
-                self.uiEstablished = true
-            }
-        }
     }
 
-    /// Called by RootView once its hosting NSWindow exists.
+    /// Called by RootView the moment its hosting NSWindow is installed. With
+    /// the open-documents event handled ourselves, SwiftUI only ever creates
+    /// a window for a *management* launch (a plain launch, or a Dock reopen) —
+    /// never for a headless drop. So this firing is the deterministic signal
+    /// that we're in management mode; reveal the window and stay alive.
+    ///
+    /// The `launchedViaDrop && !managementActive` branch is defensive: if a
+    /// stray auto-window ever did appear during a headless drop, keep it
+    /// hidden (transparent + off-screen, so no flash) and let the app quit.
     func registerMainWindow(_ window: NSWindow) {
         mainWindow = window
-        // If the window materialized during a headless drop launch, keep it
-        // off-screen until the user explicitly asks for it.
-        if launchedViaDrop && !uiEstablished {
+        if launchedViaDrop && !managementActive {
+            window.alphaValue = 0
             window.orderOut(nil)
+        } else {
+            managementActive = true
+            revealWindow()
         }
     }
 
-    func application(_ application: NSApplication, open urls: [URL]) {
-        log.info("open: \(urls.count, privacy: .public) url(s)")
-        if !uiEstablished {
-            // Cold drop launch: run headless, suppress the auto window.
-            launchedViaDrop = true
-            mainWindow?.orderOut(nil)
-        }
+    @objc private func handleOpenDocuments(_ event: NSAppleEventDescriptor, withReplyEvent: NSAppleEventDescriptor) {
+        let urls = Self.fileURLs(from: event)
+        guard !urls.isEmpty else { return }
+        // If no management window is up, this is a cold/headless drop launch.
+        if !managementActive { launchedViaDrop = true }
         // Warm drop (management window already up): leave the window alone.
         beginTask(urls)
+    }
+
+    /// Pull file URLs out of an `kAEOpenDocuments` event's direct object,
+    /// whether it's a single descriptor or a list.
+    private static func fileURLs(from event: NSAppleEventDescriptor) -> [URL] {
+        guard let direct = event.paramDescriptor(forKeyword: AEKeyword(keyDirectObject)) else { return [] }
+        func url(_ d: NSAppleEventDescriptor) -> URL? {
+            guard let coerced = d.coerce(toDescriptorType: typeFileURL) else { return nil }
+            return URL(dataRepresentation: coerced.data, relativeTo: nil)
+        }
+        let count = direct.numberOfItems
+        if count == 0 { return [url(direct)].compactMap { $0 } }
+        return (1...count).compactMap { direct.atIndex($0).flatMap(url) }
+    }
+
+    private func revealWindow() {
+        guard let window = mainWindow else { return }
+        window.alphaValue = 1
+        window.makeKeyAndOrderFront(nil)
     }
 
     private func beginTask(_ urls: [URL]) {
@@ -98,19 +139,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     /// The PRD §3.1 rule, evaluated at every transition (task finished,
     /// window closed).
     private func evaluateTermination() {
-        if activeTasks == 0 && !isMainWindowVisible {
+        if activeTasks == 0 && !managementActive {
             log.info("no tasks, no window — terminating")
             NSApp.terminate(nil)
         }
     }
 
-    private var isMainWindowVisible: Bool {
-        mainWindow?.isVisible ?? false
-    }
-
     @objc private func mainWindowWillClose(_ note: Notification) {
         guard let closed = note.object as? NSWindow, closed === mainWindow else { return }
-        uiEstablished = false
+        managementActive = false
         // Let the close settle before deciding (a task may still be running,
         // in which case we wait for it to finish instead).
         DispatchQueue.main.async { [weak self] in self?.evaluateTermination() }
@@ -119,10 +156,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         if !flag {
             // Dock click while running headless → surface the management window.
-            mainWindow?.makeKeyAndOrderFront(nil)
+            managementActive = true
             NSApp.activate(ignoringOtherApps: true)
-            uiEstablished = true
-            return false  // handled — don't let AppKit spawn a second window
+            if mainWindow != nil {
+                revealWindow()
+                return false  // we revealed the existing (hidden) window
+            }
+            // Headless drop launch created no window — let AppKit make one
+            // (applicationShouldOpenUntitledFile). registerMainWindow reveals
+            // it because managementActive is now true.
+            return true
         }
         return true
     }
