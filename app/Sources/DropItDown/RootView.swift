@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import UserNotifications
 
 /// Open the Settings scene via AppKit. `@Environment(\.openSettings)` only
 /// exists in newer SDKs (it fails to compile against the macOS 14 SDK CI
@@ -38,10 +39,13 @@ struct RootView: View {
     @State private var searchText: String = ""
 
     var body: some View {
-        Group {
-            switch tab {
-            case .history: HistoryView(searchText: $searchText)
-            case .notes:   NotesView()
+        VStack(spacing: 0) {
+            NotificationHint()
+            Group {
+                switch tab {
+                case .history: HistoryView(searchText: $searchText)
+                case .notes:   NotesView()
+                }
             }
         }
         .toolbar {
@@ -121,6 +125,54 @@ struct SearchField: NSViewRepresentable {
         func controlTextDidChange(_ note: Notification) {
             guard let field = note.object as? NSSearchField else { return }
             parent.text = field.stringValue
+        }
+    }
+}
+
+/// A thin banner shown only when macOS notification permission is denied.
+/// For a use-once-and-die app the notification *is* the result feedback, so
+/// a silent denial would leave the user with no signal at all.
+struct NotificationHint: View {
+    @State private var denied = false
+    @State private var dismissed = false
+
+    var body: some View {
+        Group {
+            if denied && !dismissed {
+                HStack(spacing: 10) {
+                    Image(systemName: "bell.slash.fill")
+                        .foregroundStyle(.orange)
+                    Text("Notifications are off — you won't see archive results when a drop finishes.")
+                        .font(.callout)
+                    Spacer(minLength: 8)
+                    Button("Open Settings") { openNotificationSettings() }
+                    Button {
+                        dismissed = true
+                    } label: {
+                        Image(systemName: "xmark")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Dismiss")
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(Color.orange.opacity(0.12))
+                .overlay(Divider(), alignment: .bottom)
+            }
+        }
+        .onAppear(perform: refresh)
+    }
+
+    private func refresh() {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            let isDenied = settings.authorizationStatus == .denied
+            DispatchQueue.main.async { self.denied = isDenied }
+        }
+    }
+
+    private func openNotificationSettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension") {
+            NSWorkspace.shared.open(url)
         }
     }
 }
