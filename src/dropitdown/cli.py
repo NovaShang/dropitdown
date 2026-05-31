@@ -9,8 +9,11 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from dropitdown import archive as archive_mod
-from dropitdown import ignore, journal, watcher
+# NOTE: keep module-level imports lightweight. `watcher` (→ markitdown) and
+# `archive` (→ openai) pull in ~0.6s of heavy dependencies, which the Swift
+# app pays on every startup when it only wants `history`/`config`. Import
+# those lazily inside the commands that actually need them.
+from dropitdown import ignore, journal
 from dropitdown.config import (
     CONFIG_PATH,
     Config,
@@ -62,6 +65,8 @@ def init() -> None:
 @app.command()
 def start() -> None:
     """Run the inbox watcher (foreground)."""
+    from dropitdown import watcher
+
     cfg = _load_config_or_die()
     if not cfg.api_key:
         console.print("[red]No API key. Set in config or DEEPSEEK_API_KEY env.[/red]")
@@ -81,6 +86,8 @@ def process(
 
     Exit code: 0 if all files succeeded, 1 if any failed.
     """
+    from dropitdown import watcher
+
     cfg = _load_config_or_die()
     if not cfg.api_key:
         console.print("[red]No API key. Set in config or DEEPSEEK_API_KEY env.[/red]")
@@ -159,6 +166,8 @@ def history(
 def undo(record_id: int) -> None:
     """Restore an archived file to inbox/_review/ for manual triage.
     MD note is left as an orphan."""
+    from dropitdown import archive as archive_mod
+
     rec = journal.get(record_id)
     if not rec:
         console.print(f"[red]No record #{record_id}[/red]")
