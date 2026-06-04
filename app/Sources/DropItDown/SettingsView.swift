@@ -18,6 +18,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 22) {
                 if loadedFrom != nil {
                     foldersSection
+                    behaviorSection
                     classificationSection
                     visionSection
                     advancedSection
@@ -68,9 +69,17 @@ struct SettingsView: View {
         guard let cfg = loadedFrom else { return }
         let changes = draft.changes(from: cfg)
         guard !changes.isEmpty else { return }
+        let changedKeys = Set(changes.map { $0.0 })
         saving = true
         Task {
             await config.save(changes)
+            // Side effects that live outside config.toml:
+            if changedKeys.contains("launch_at_login") {
+                LoginItem.set(draft.launchAtLogin)
+            }
+            if changedKeys.contains("menu_bar_enabled") {
+                NotificationCenter.default.post(name: .dropItDownConfigChanged, object: nil)
+            }
             saving = false
             // Re-baseline the draft against the freshly persisted config.
             if let fresh = config.config {
@@ -95,6 +104,30 @@ struct SettingsView: View {
             FolderField(label: "Inbox", path: $draft.inbox)
             FolderField(label: "Archive root", path: $draft.archiveRoot)
             FolderField(label: "Markdown root", path: $draft.mdRoot)
+        }
+    }
+
+    private var behaviorSection: some View {
+        SettingsGroup(title: "Behavior", systemImage: "slider.horizontal.3") {
+            FormRow(label: "Drop action") {
+                Picker("", selection: $draft.dropAction) {
+                    ForEach(DropAction.allCases) { a in
+                        Text(a.title).tag(a.rawValue)
+                    }
+                }
+                .labelsHidden()
+                .fixedSize()
+                Text(DropAction.from(draft.dropAction).subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Toggle(isOn: $draft.menuBarEnabled) {
+                Text("Live in the menu bar")
+            }
+            helpText("Resident menu-bar agent (drop onto the icon). Off: classic Dock-icon mode. Takes effect after relaunch.")
+            Toggle(isOn: $draft.launchAtLogin) {
+                Text("Launch at login")
+            }
         }
     }
 
@@ -270,6 +303,9 @@ struct ConfigDraft {
     var inbox = ""
     var archiveRoot = ""
     var mdRoot = ""
+    var dropAction = "archive"
+    var menuBarEnabled = true
+    var launchAtLogin = false
     var classificationMode = "hosted"
     var proxyURL = ""
     var baseURL = ""
@@ -287,6 +323,9 @@ struct ConfigDraft {
         inbox = cfg.inbox
         archiveRoot = cfg.archiveRoot
         mdRoot = cfg.mdRoot
+        dropAction = cfg.dropAction
+        menuBarEnabled = cfg.menuBarEnabled
+        launchAtLogin = cfg.launchAtLogin
         classificationMode = cfg.classificationMode
         proxyURL = cfg.proxyURL
         baseURL = cfg.baseURL
@@ -311,6 +350,13 @@ struct ConfigDraft {
         add("inbox", inbox, cfg.inbox)
         add("archive_root", archiveRoot, cfg.archiveRoot)
         add("md_root", mdRoot, cfg.mdRoot)
+        add("drop_action", dropAction, cfg.dropAction)
+        if menuBarEnabled != cfg.menuBarEnabled {
+            out.append(("menu_bar_enabled", menuBarEnabled ? "true" : "false"))
+        }
+        if launchAtLogin != cfg.launchAtLogin {
+            out.append(("launch_at_login", launchAtLogin ? "true" : "false"))
+        }
         add("classification_mode", classificationMode, cfg.classificationMode)
 
         if classificationMode == "hosted" {

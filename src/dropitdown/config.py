@@ -14,8 +14,10 @@ JOURNAL_PATH = DATA_DIR / "journal.db"
 DEVICE_ID_PATH = APP_SUPPORT_DIR / "device_id"
 
 # Default hosted proxy URL — when no api_key is configured, the app talks
-# here using a per-device token. The proxy is OpenAI-compatible.
-DEFAULT_PROXY_URL = "https://dropitdown-proxy.styleshang.workers.dev"
+# here using a per-device token. The proxy is OpenAI-compatible. The `/v1`
+# suffix is required: the OpenAI client posts to `<base_url>/chat/completions`
+# verbatim, and the worker only serves `/v1/chat/completions`.
+DEFAULT_PROXY_URL = "https://dropitdown-proxy.styleshang.workers.dev/v1"
 
 # Legacy paths from the early CLI days; migrated on first run.
 _LEGACY_CONFIG_DIR = Path(os.path.expanduser("~/.config/dropitdown"))
@@ -83,6 +85,14 @@ class Config:
     classification_mode: str = "hosted"
     proxy_url: str = ""
     device_id: str = ""
+    # Behavior / UX. `drop_action` is what a plain drop does (and the default
+    # action of the menu-bar panel): archive | note_only | copy_md | instruct.
+    # `menu_bar_enabled` selects the resident menu-bar agent over the legacy
+    # launch-on-drop Dock lifecycle. `launch_at_login` mirrors the macOS
+    # login-item registration for the settings UI.
+    drop_action: str = "archive"
+    menu_bar_enabled: bool = True
+    launch_at_login: bool = False
     # Azure Content Understanding (optional). Auth resolves in this order:
     #   AZURE_API_KEY env var → DefaultAzureCredential (az login).
     cu_endpoint: str = ""
@@ -143,15 +153,22 @@ class Config:
             cu_api_key=data.get("cu_api_key", "") or os.environ.get("AZURE_API_KEY", ""),
             cu_analyzer_id=data.get("cu_analyzer_id", ""),
             cu_file_types=[str(t).lower().lstrip(".") for t in data.get("cu_file_types", [])],
+            drop_action=str(data.get("drop_action", "archive")),
+            menu_bar_enabled=bool(data.get("menu_bar_enabled", True)),
+            launch_at_login=bool(data.get("launch_at_login", False)),
         )
 
 
 def write_config(cfg: dict) -> None:
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     lines: list[str] = []
-    for key in ["inbox", "archive_root", "md_root", "api_key", "base_url", "model"]:
+    str_keys = ["inbox", "archive_root", "md_root", "api_key", "base_url", "model", "drop_action"]
+    for key in str_keys:
         if key in cfg:
             lines.append(f'{key} = "{cfg[key]}"')
+    for key in ["menu_bar_enabled", "launch_at_login"]:
+        if key in cfg:
+            lines.append(f"{key} = {str(bool(cfg[key])).lower()}")
     if "max_content_chars" in cfg:
         lines.append(f"max_content_chars = {cfg['max_content_chars']}")
     CONFIG_PATH.write_text("\n".join(lines) + "\n")

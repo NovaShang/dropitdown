@@ -18,11 +18,12 @@ struct DropItDownApp: App {
         .defaultSize(width: 1180, height: 740)
         .commands {
             CommandGroup(replacing: .newItem) {}
-        }
-
-        Settings {
-            PreferencesView()
-                .environmentObject(delegate.config)
+            // Route the standard Settings… item (⌘,) to our own window — the
+            // SwiftUI Settings scene doesn't open reliably in accessory mode.
+            CommandGroup(replacing: .appSettings) {
+                Button("Settings…") { openSettingsWindow() }
+                    .keyboardShortcut(",", modifiers: .command)
+            }
         }
     }
 }

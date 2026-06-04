@@ -5,6 +5,9 @@ struct AppConfig: Codable {
     var archiveRoot: String
     var mdRoot: String
     var classificationMode: String
+    var dropAction: String
+    var menuBarEnabled: Bool
+    var launchAtLogin: Bool
     var model: String
     var baseURL: String
     var proxyURL: String
@@ -21,6 +24,9 @@ struct AppConfig: Codable {
         case archiveRoot = "archive_root"
         case mdRoot = "md_root"
         case classificationMode = "classification_mode"
+        case dropAction = "drop_action"
+        case menuBarEnabled = "menu_bar_enabled"
+        case launchAtLogin = "launch_at_login"
         case model
         case baseURL = "base_url"
         case proxyURL = "proxy_url"
@@ -32,6 +38,69 @@ struct AppConfig: Codable {
         case cuFileTypes = "cu_file_types"
         case hasCUKey = "has_cu_key"
     }
+
+    // Tolerate an older CLI / partial JSON that predates the behavior keys.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        inbox = try c.decode(String.self, forKey: .inbox)
+        archiveRoot = try c.decode(String.self, forKey: .archiveRoot)
+        mdRoot = try c.decode(String.self, forKey: .mdRoot)
+        classificationMode = try c.decode(String.self, forKey: .classificationMode)
+        dropAction = try c.decodeIfPresent(String.self, forKey: .dropAction) ?? "archive"
+        menuBarEnabled = try c.decodeIfPresent(Bool.self, forKey: .menuBarEnabled) ?? true
+        launchAtLogin = try c.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? false
+        model = try c.decode(String.self, forKey: .model)
+        baseURL = try c.decode(String.self, forKey: .baseURL)
+        proxyURL = try c.decode(String.self, forKey: .proxyURL)
+        deviceID = try c.decode(String.self, forKey: .deviceID)
+        hasAPIKey = try c.decode(Bool.self, forKey: .hasAPIKey)
+        maxContentChars = try c.decode(Int.self, forKey: .maxContentChars)
+        cuEndpoint = try c.decode(String.self, forKey: .cuEndpoint)
+        cuAnalyzerID = try c.decode(String.self, forKey: .cuAnalyzerID)
+        cuFileTypes = try c.decode([String].self, forKey: .cuFileTypes)
+        hasCUKey = try c.decode(Bool.self, forKey: .hasCUKey)
+    }
+}
+
+/// The four things a drop can do. Shared by the onboarding wizard, the
+/// Behavior settings, and (step 3) the menu-bar drop panel. The raw value is
+/// exactly the token the `process`/`copy-md` CLI expects.
+enum DropAction: String, CaseIterable, Identifiable {
+    case archive
+    case noteOnly = "note_only"
+    case copyMD = "copy_md"
+    case instruct
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .archive:  return "Archive"
+        case .noteOnly: return "Note only"
+        case .copyMD:   return "Copy Markdown"
+        case .instruct: return "Ask AI"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .archive:  return "Convert, classify, file the original, write a note"
+        case .noteOnly: return "Write a note but leave the original in place"
+        case .copyMD:   return "Convert to Markdown on the clipboard, save nothing"
+        case .instruct: return "Type a one-line instruction, then archive"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .archive:  return "tray.and.arrow.down"
+        case .noteOnly: return "note.text"
+        case .copyMD:   return "doc.on.clipboard"
+        case .instruct: return "text.bubble"
+        }
+    }
+
+    static func from(_ raw: String) -> DropAction { DropAction(rawValue: raw) ?? .archive }
 }
 
 @MainActor
@@ -40,6 +109,12 @@ final class ConfigStore: ObservableObject {
     @Published private(set) var ignorePatterns: [String] = []
     @Published private(set) var rules: [String] = []
     @Published private(set) var loading: Bool = false
+    /// True once a config fetch has completed and found no config.toml — the
+    /// first-run signal that drives the onboarding wizard.
+    @Published private(set) var needsSetup: Bool = false
+    /// False until the first fetch returns, so the UI can show a spinner
+    /// rather than flashing the onboarding screen on launch.
+    @Published private(set) var hasLoadedOnce: Bool = false
     private let runner = PythonRunner()
     private var inflight = false
 
@@ -52,10 +127,31 @@ final class ConfigStore: ObservableObject {
             async let cfg = fetchConfig()
             async let pats = fetchIgnore()
             async let rls = fetchRules()
-            self.config = await cfg
+            // Don't clobber a previously-good config with a transient nil (a
+            // hiccup in `config show` would otherwise bounce the user to
+            // onboarding / "No vault configured").
+            if let fetched = await cfg { self.config = fetched }
             self.ignorePatterns = await pats
             self.rules = await rls
+            self.needsSetup = (self.config == nil)
+            self.hasLoadedOnce = true
         }
+    }
+
+    /// Run the non-interactive first-run setup, then reload. Returns true on
+    /// success. `dropAction` is a `DropAction.rawValue`.
+    @discardableResult
+    func setup(archiveRoot: String, mdRoot: String, dropAction: String,
+               menuBar: Bool, launchAtLogin: Bool) async -> Bool {
+        var args = ["setup",
+                    "--archive-root", archiveRoot,
+                    "--md-root", mdRoot,
+                    "--drop-action", dropAction]
+        args.append(menuBar ? "--menu-bar" : "--no-menu-bar")
+        args.append(launchAtLogin ? "--launch-at-login" : "--no-launch-at-login")
+        let (_, code) = await runner.runCLI(args)
+        await reload()
+        return code == 0
     }
 
     private func fetchConfig() async -> AppConfig? {
@@ -114,8 +210,10 @@ final class ConfigStore: ObservableObject {
         async let cfg = fetchConfig()
         async let pats = fetchIgnore()
         async let rls = fetchRules()
-        self.config = await cfg
+        if let fetched = await cfg { self.config = fetched }
         self.ignorePatterns = await pats
         self.rules = await rls
+        self.needsSetup = (self.config == nil)
+        self.hasLoadedOnce = true
     }
 }

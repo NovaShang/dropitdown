@@ -77,14 +77,18 @@ final class PythonRunner: Sendable {
 
     /// Process the given absolute file paths serially. Returns one result
     /// per file. Runs on a detached task so MainActor stays free for the UI.
-    func process(files: [String]) async -> [ProcessResult] {
+    /// `move` false is the "note only" action (original stays in place).
+    func process(files: [String], move: Bool = true, folderMode: String? = nil) async -> [ProcessResult] {
         let callID = UUID().uuidString.prefix(8)
-        log.info("process(files:) called id=\(callID, privacy: .public) files=\(files, privacy: .public)")
-        return await Task.detached { [files] () -> [ProcessResult] in
+        log.info("process(files:) called id=\(callID, privacy: .public) move=\(move) folderMode=\(folderMode ?? "-", privacy: .public) files=\(files, privacy: .public)")
+        return await Task.detached { [files, move, folderMode] () -> [ProcessResult] in
             let runner = PythonRunner()
             let cli = runner.cliPath()
             log.info("process(files:) detached run id=\(callID, privacy: .public) cli=\(cli, privacy: .public)")
-            let args = ["process", "--json", "--no-notify"] + files
+            let args = ["process", "--json", "--no-notify"]
+                + (move ? [] : ["--no-move"])
+                + (folderMode.map { ["--folder-mode", $0] } ?? [])
+                + files
             let (stdout, stderr, exitCode) = runner.runBlocking(args: args)
             log.info("subprocess id=\(callID, privacy: .public) exited code=\(exitCode), stdout_len=\(stdout.count)")
             if !stderr.isEmpty {

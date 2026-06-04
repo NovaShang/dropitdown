@@ -63,6 +63,33 @@ def init() -> None:
 
 
 @app.command()
+def setup(
+    archive_root: str = typer.Option(..., help="Where original files are filed."),
+    md_root: str = typer.Option(..., help="Where Markdown notes are written."),
+    inbox: str = typer.Option("~/DropItDown", help="Watched inbox / undo restore dir."),
+    drop_action: str = typer.Option("archive", help="archive | note_only | copy_md | instruct"),
+    menu_bar: bool = typer.Option(True, "--menu-bar/--no-menu-bar", help="Resident menu-bar agent vs Dock lifecycle."),
+    launch_at_login: bool = typer.Option(False, "--launch-at-login/--no-launch-at-login"),
+) -> None:
+    """Non-interactive first-run setup, written for the GUI onboarding wizard.
+    Creates config.toml in hosted mode (free quota, no API key needed) and the
+    target folders. Idempotent — overwrites an existing config."""
+    for p in (inbox, archive_root, md_root):
+        Path(os.path.expanduser(p)).mkdir(parents=True, exist_ok=True)
+    write_config({
+        "inbox": inbox,
+        "archive_root": archive_root,
+        "md_root": md_root,
+        "drop_action": drop_action,
+        "menu_bar_enabled": menu_bar,
+        "launch_at_login": launch_at_login,
+        "max_content_chars": 8000,
+    })
+    ignore.load()  # seed ignore file with defaults
+    console.print(f"[green]Wrote[/green] {CONFIG_PATH}")
+
+
+@app.command()
 def start() -> None:
     """Run the inbox watcher (foreground)."""
     from dropitdown import watcher
@@ -79,12 +106,19 @@ def process(
     files: list[Path] = typer.Argument(..., help="One or more file paths to process."),
     json_out: bool = typer.Option(False, "--json", help="Emit one JSON line per file to stdout (for IPC)."),
     notify_native: bool = typer.Option(True, "--notify/--no-notify", help="Send macOS notification per file."),
+    move: bool = typer.Option(True, "--move/--no-move", help="Move the original into the archive (--no-move = note only)."),
+    folder_mode: str = typer.Option(
+        "expand", "--folder-mode",
+        help="How to handle dropped directories: 'expand' files each contained "
+        "file separately, 'whole' archives the directory as one unit.",
+    ),
 ) -> None:
     """Process one or more files end-to-end (serial). Used by the Mac .app
     when files are dropped on the Dock icon. Exits when done; suitable for
     'launch on demand, die on completion' lifecycle.
 
-    Exit code: 0 if all files succeeded, 1 if any failed.
+    Directories are handled per `--folder-mode`. Exit code: 0 if everything
+    succeeded, 1 if any item failed.
     """
     from dropitdown import watcher
 
@@ -93,28 +127,56 @@ def process(
         console.print("[red]No API key. Set in config or DEEPSEEK_API_KEY env.[/red]")
         raise typer.Exit(1)
 
+    def emit(result: "watcher.ProcessResult") -> None:
+        if not json_out:
+            return
+        payload = {
+            "ok": result.ok,
+            "src": str(result.src),
+            "record_id": result.record_id,
+            "archived_path": str(result.archived_path) if result.archived_path else None,
+            "md_path": str(result.md_path) if result.md_path else None,
+            "category": result.category,
+            "summary": result.summary,
+            "error": result.error,
+            "skipped_reason": result.skipped_reason,
+        }
+        sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
+        sys.stdout.flush()
+
     any_failed = False
     for f in files:
-        result = watcher.process_one(cfg, f.resolve(), send_notification=notify_native)
-        if json_out:
-            payload = {
-                "ok": result.ok,
-                "src": str(result.src),
-                "record_id": result.record_id,
-                "archived_path": str(result.archived_path) if result.archived_path else None,
-                "md_path": str(result.md_path) if result.md_path else None,
-                "category": result.category,
-                "summary": result.summary,
-                "error": result.error,
-                "skipped_reason": result.skipped_reason,
-            }
-            sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
-            sys.stdout.flush()
-        if not result.ok:
-            any_failed = True
+        target = f.resolve()
+        if target.is_dir():
+            results = watcher.process_folder(
+                cfg, target, mode=folder_mode, send_notification=notify_native, move=move
+            )
+        else:
+            results = [watcher.process_one(cfg, target, send_notification=notify_native, move=move)]
+        for result in results:
+            emit(result)
+            if not result.ok:
+                any_failed = True
 
     if any_failed:
         raise typer.Exit(1)
+
+
+@app.command(name="copy-md")
+def copy_md(
+    file: Path = typer.Argument(..., help="File to convert."),
+) -> None:
+    """Convert a file to Markdown and copy it to the clipboard. Saves nothing,
+    moves nothing — the "copy Markdown" drop action."""
+    from dropitdown import convert, notify
+
+    cfg = _load_config_or_die()  # for CU routing; no LLM key needed
+    md = convert.to_markdown(file.resolve(), cfg=cfg)
+    if notify.copy_to_clipboard(md):
+        console.print(f"[green]✓[/green] Copied {len(md)} chars to clipboard")
+    else:
+        # Clipboard unavailable (headless) — still emit so callers can capture.
+        sys.stdout.write(md)
 
 
 @app.command()
@@ -164,8 +226,9 @@ def history(
 
 @app.command()
 def undo(record_id: int) -> None:
-    """Restore an archived file to inbox/_review/ for manual triage.
-    MD note is left as an orphan."""
+    """Reverse a record. A normal archive is restored to inbox/_review/ for
+    manual triage (its MD note is left as an orphan). A "note only" record
+    moved nothing, so undo just deletes the orphan note."""
     from dropitdown import archive as archive_mod
 
     rec = journal.get(record_id)
@@ -175,6 +238,15 @@ def undo(record_id: int) -> None:
     if rec.undone:
         console.print(f"[yellow]Record #{record_id} already undone.[/yellow]")
         return
+
+    # Note-only record: nothing was moved, so undo means removing the note.
+    if not rec.moved:
+        if rec.md_path:
+            Path(rec.md_path).unlink(missing_ok=True)
+        journal.mark_undone(record_id)
+        console.print(f"[green]✓[/green] Removed note (original was never moved)")
+        return
+
     cfg = _load_config_or_die()
     review_dir = cfg.inbox / "_review"
     ok, msg = archive_mod.undo(
@@ -330,6 +402,9 @@ def config_show(
             "archive_root": str(cfg.archive_root),
             "md_root": str(cfg.md_root),
             "classification_mode": cfg.classification_mode,
+            "drop_action": cfg.drop_action,
+            "menu_bar_enabled": cfg.menu_bar_enabled,
+            "launch_at_login": cfg.launch_at_login,
             "model": cfg.model,
             "base_url": cfg.base_url,
             "proxy_url": cfg.proxy_url,
@@ -372,12 +447,15 @@ def config_set(
     # the Swift settings UI can set list/int values without corrupting them.
     list_keys = {"cu_file_types"}
     int_keys = {"max_content_chars"}
+    bool_keys = {"menu_bar_enabled", "launch_at_login"}
     if key in list_keys:
         data[key] = [
             part.strip().lstrip(".").lower()
             for part in value.split(",")
             if part.strip()
         ]
+    elif key in bool_keys:
+        data[key] = value.strip().lower() in ("1", "true", "yes", "on")
     elif key in int_keys:
         try:
             data[key] = int(value)

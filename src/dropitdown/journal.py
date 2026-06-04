@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS archives (
     md_path TEXT,
     category TEXT,
     summary TEXT,
-    undone INTEGER NOT NULL DEFAULT 0
+    undone INTEGER NOT NULL DEFAULT 0,
+    moved INTEGER NOT NULL DEFAULT 1
 );
 """
 
@@ -31,6 +32,10 @@ class Record:
     category: str | None
     summary: str | None
     undone: bool
+    # False when the original file was left in place (the "note only" drop
+    # action). Undo of such a record just deletes the note — there's no move
+    # to reverse.
+    moved: bool
 
 
 def _connect() -> sqlite3.Connection:
@@ -38,7 +43,16 @@ def _connect() -> sqlite3.Connection:
     conn = sqlite3.connect(JOURNAL_PATH)
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
+    _migrate(conn)
     return conn
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Add columns introduced after the initial schema. Pre-existing rows
+    are all real archives (file moved), so `moved` defaults to 1."""
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(archives)")}
+    if "moved" not in cols:
+        conn.execute("ALTER TABLE archives ADD COLUMN moved INTEGER NOT NULL DEFAULT 1")
 
 
 def record(
@@ -47,11 +61,12 @@ def record(
     md_path: Path | None,
     category: str | None,
     summary: str | None,
+    moved: bool = True,
 ) -> int:
     with _connect() as conn:
         cur = conn.execute(
-            "INSERT INTO archives (ts, source_path, archived_path, md_path, category, summary) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO archives (ts, source_path, archived_path, md_path, category, summary, moved) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
             (
                 datetime.now(timezone.utc).isoformat(timespec="seconds"),
                 str(source_path),
@@ -59,6 +74,7 @@ def record(
                 str(md_path) if md_path else None,
                 category,
                 summary,
+                1 if moved else 0,
             ),
         )
         return int(cur.lastrowid)
@@ -126,4 +142,5 @@ def _row_to_record(row: sqlite3.Row) -> Record:
         category=row["category"],
         summary=row["summary"],
         undone=bool(row["undone"]),
+        moved=bool(row["moved"]),
     )

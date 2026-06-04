@@ -8,9 +8,10 @@ import UserNotifications
 /// macOS 13+, falling back to the old `showPreferencesWindow:` name.
 @MainActor
 func openSettingsWindow() {
-    if !NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil) {
-        NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
-    }
+    // The SwiftUI `Settings` scene + `showSettingsWindow:` is unreliable in
+    // accessory (menu-bar) mode, so the AppDelegate hosts its own preferences
+    // window. Route everyone through it via a notification.
+    NotificationCenter.default.post(name: .dropItDownOpenSettings, object: nil)
 }
 
 enum Tab: Hashable, CaseIterable {
@@ -39,6 +40,22 @@ struct RootView: View {
     @State private var searchText: String = ""
 
     var body: some View {
+        Group {
+            if !config.hasLoadedOnce {
+                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if config.needsSetup {
+                OnboardingView()
+            } else {
+                mainContent
+            }
+        }
+        .task {
+            history.refresh()
+            config.refresh()
+        }
+    }
+
+    private var mainContent: some View {
         VStack(spacing: 0) {
             NotificationHint()
             Group {
@@ -84,10 +101,6 @@ struct RootView: View {
                         .frame(width: 200)
                 }
             }
-        }
-        .task {
-            history.refresh()
-            config.refresh()
         }
     }
 }
