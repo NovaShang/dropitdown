@@ -55,6 +55,16 @@ struct RootView: View {
         }
     }
 
+    private var brandLabel: some View {
+        HStack(spacing: 8) {
+            AppLogoView()
+                .frame(width: 22, height: 22)
+            Text("DropItDown")
+                .font(.headline)
+        }
+        .padding(.trailing, 8)
+    }
+
     private var mainContent: some View {
         VStack(spacing: 0) {
             NotificationHint()
@@ -66,15 +76,25 @@ struct RootView: View {
             }
         }
         .toolbar {
-            ToolbarItem(placement: .navigation) {
-                HStack(spacing: 8) {
-                    AppLogoView()
-                        .frame(width: 22, height: 22)
-                    Text("DropItDown")
-                        .font(.headline)
-                }
-                .padding(.trailing, 8)
+            // The logo + brand belong to the title bar, not a control. On the
+            // macOS 26 SDK (Liquid Glass) every custom toolbar item is given a
+            // glass "capsule" background by default, which makes the brand look
+            // like a button — opt it out so it reads flush with the title bar.
+            //   • `if #available` guards the runtime (symbol only on macOS 26+).
+            //   • `#if compiler(>=6.2)` guards the SDK: the release build links
+            //     against the macOS 14 SDK where this symbol doesn't exist, so
+            //     even referencing it inside `#available` wouldn't compile there.
+            //     (That older-SDK build has no glass capsule to begin with.)
+            #if compiler(>=6.2)
+            if #available(macOS 26.0, *) {
+                ToolbarItem(placement: .navigation) { brandLabel }
+                    .sharedBackgroundVisibility(.hidden)
+            } else {
+                ToolbarItem(placement: .navigation) { brandLabel }
             }
+            #else
+            ToolbarItem(placement: .navigation) { brandLabel }
+            #endif
             ToolbarItem(placement: .principal) {
                 Picker("View", selection: $tab) {
                     ForEach(Tab.allCases, id: \.self) { t in
