@@ -107,13 +107,6 @@ def process_one(
         )
         console.print(f"  [dim]{result.summary}[/dim]")
 
-        try:
-            md_body = md_path.read_text(encoding="utf-8")
-            if notify.copy_to_clipboard(md_body):
-                console.print("  [dim]📋 copied to clipboard[/dim]")
-        except OSError:
-            pass
-
         if send_notification:
             notify.notify(
                 title=f"DropItDown · {result.category_path}",

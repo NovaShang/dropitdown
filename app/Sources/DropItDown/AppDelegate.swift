@@ -270,6 +270,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         if result.ok {
             content.title = "DropItDown · \(result.category ?? "")"
             content.body = "\(URL(fileURLWithPath: result.src).lastPathComponent) → \(result.summary ?? "")"
+            if result.mdPath != nil {
+                content.subtitle = "📋 .md path on clipboard"
+            }
             if let id = result.recordID {
                 content.userInfo = ["recordID": id]
                 content.categoryIdentifier = Self.archivedCategoryID

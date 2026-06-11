@@ -147,6 +147,7 @@ def process(
         sys.stdout.flush()
 
     any_failed = False
+    md_paths: list[str] = []
     for f in files:
         target = f.resolve()
         if target.is_dir():
@@ -159,6 +160,19 @@ def process(
             emit(result)
             if not result.ok:
                 any_failed = True
+            elif result.md_path:
+                md_paths.append(str(result.md_path))
+
+    # The note paths land on the clipboard (one per line) so they can be
+    # pasted straight into an agent — reading a path is far cheaper in
+    # tokens than pasting the converted content.
+    if md_paths:
+        from dropitdown import notify
+
+        if notify.copy_to_clipboard("\n".join(md_paths)):
+            console.print(
+                f"  [dim]📋 {len(md_paths)} note path(s) on the clipboard[/dim]"
+            )
 
     if any_failed:
         raise typer.Exit(1)
