@@ -77,9 +77,6 @@ struct SettingsView: View {
             if changedKeys.contains("launch_at_login") {
                 LoginItem.set(draft.launchAtLogin)
             }
-            if changedKeys.contains("menu_bar_enabled") {
-                NotificationCenter.default.post(name: .dropItDownConfigChanged, object: nil)
-            }
             saving = false
             // Re-baseline the draft against the freshly persisted config.
             if let fresh = config.config {
@@ -121,10 +118,6 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            Toggle(isOn: $draft.menuBarEnabled) {
-                Text("Live in the menu bar")
-            }
-            helpText("Resident menu-bar agent (drop onto the icon). Off: classic Dock-icon mode. Takes effect after relaunch.")
             Toggle(isOn: $draft.launchAtLogin) {
                 Text("Launch at login")
             }
@@ -133,46 +126,20 @@ struct SettingsView: View {
 
     private var classificationSection: some View {
         SettingsGroup(title: "Classification", systemImage: "brain") {
-            FormRow(label: "Mode") {
-                Picker("", selection: $draft.classificationMode) {
-                    Text("Hosted (free quota)").tag("hosted")
-                    Text("Bring your own key").tag("byok")
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
+            FormRow(label: "Endpoint") {
+                TextField("https://api.deepseek.com", text: $draft.baseURL)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.callout.monospaced())
             }
-
-            if draft.classificationMode == "hosted" {
-                FormRow(label: "Proxy") {
-                    TextField("https://…", text: $draft.proxyURL)
-                        .textFieldStyle(.roundedBorder)
-                        .font(.callout.monospaced())
-                }
-                if let id = loadedFrom?.deviceID, !id.isEmpty {
-                    FormRow(label: "Device ID") {
-                        Text(deviceFingerprint(id))
-                            .font(.callout.monospaced())
-                            .foregroundStyle(.secondary)
-                            .textSelection(.enabled)
-                    }
-                }
-                helpText("Hosted mode uses a free monthly quota through the DropItDown proxy. No key needed.")
-            } else {
-                FormRow(label: "Endpoint") {
-                    TextField("https://api.deepseek.com", text: $draft.baseURL)
-                        .textFieldStyle(.roundedBorder)
-                        .font(.callout.monospaced())
-                }
-                FormRow(label: "Model") {
-                    TextField("deepseek-chat", text: $draft.model)
-                        .textFieldStyle(.roundedBorder)
-                        .font(.callout.monospaced())
-                }
-                SecretField(label: "API key",
-                            isSet: loadedFrom?.hasAPIKey ?? false,
-                            value: $draft.apiKey)
-                helpText("Works with any OpenAI-compatible endpoint (DeepSeek, OpenAI, Claude proxies, …).")
+            FormRow(label: "Model") {
+                TextField("deepseek-chat", text: $draft.model)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.callout.monospaced())
             }
+            SecretField(label: "API key",
+                        isSet: loadedFrom?.hasAPIKey ?? false,
+                        value: $draft.apiKey)
+            helpText("Works with any OpenAI-compatible endpoint (DeepSeek, OpenAI, Claude proxies, …).")
         }
     }
 
@@ -287,11 +254,6 @@ struct SettingsView: View {
             .appendingPathComponent("Library/Application Support/DropItDown")
         NSWorkspace.shared.selectFile(url.path, inFileViewerRootedAtPath: "")
     }
-
-    private func deviceFingerprint(_ id: String) -> String {
-        guard id.count > 14 else { return id }
-        return String(id.prefix(8)) + "…" + String(id.suffix(4))
-    }
 }
 
 // MARK: - Draft model
@@ -304,10 +266,7 @@ struct ConfigDraft {
     var archiveRoot = ""
     var mdRoot = ""
     var dropAction = "archive"
-    var menuBarEnabled = true
     var launchAtLogin = false
-    var classificationMode = "hosted"
-    var proxyURL = ""
     var baseURL = ""
     var model = ""
     var apiKey = ""
@@ -324,10 +283,7 @@ struct ConfigDraft {
         archiveRoot = cfg.archiveRoot
         mdRoot = cfg.mdRoot
         dropAction = cfg.dropAction
-        menuBarEnabled = cfg.menuBarEnabled
         launchAtLogin = cfg.launchAtLogin
-        classificationMode = cfg.classificationMode
-        proxyURL = cfg.proxyURL
         baseURL = cfg.baseURL
         model = cfg.model
         cuEndpoint = cfg.cuEndpoint
@@ -351,20 +307,11 @@ struct ConfigDraft {
         add("archive_root", archiveRoot, cfg.archiveRoot)
         add("md_root", mdRoot, cfg.mdRoot)
         add("drop_action", dropAction, cfg.dropAction)
-        if menuBarEnabled != cfg.menuBarEnabled {
-            out.append(("menu_bar_enabled", menuBarEnabled ? "true" : "false"))
-        }
         if launchAtLogin != cfg.launchAtLogin {
             out.append(("launch_at_login", launchAtLogin ? "true" : "false"))
         }
-        add("classification_mode", classificationMode, cfg.classificationMode)
-
-        if classificationMode == "hosted" {
-            add("proxy_url", proxyURL, cfg.proxyURL)
-        } else {
-            add("base_url", baseURL, cfg.baseURL)
-            add("model", model, cfg.model)
-        }
+        add("base_url", baseURL, cfg.baseURL)
+        add("model", model, cfg.model)
 
         add("cu_endpoint", cuEndpoint, cfg.cuEndpoint)
         add("cu_analyzer_id", cuAnalyzerID, cfg.cuAnalyzerID)

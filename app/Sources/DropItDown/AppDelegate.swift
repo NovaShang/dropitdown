@@ -6,16 +6,13 @@ import UserNotifications
 
 private let log = Logger(subsystem: "app.dropitdown.mac", category: "AppDelegate")
 
-/// How the app presents itself and manages its lifecycle. Chosen at launch
-/// from `menu_bar_enabled` in config, and re-applied when onboarding finishes.
+/// How the app presents itself. Decided at launch and re-applied when
+/// onboarding finishes.
 ///
 /// - `.menuBar`: resident accessory agent (no Dock icon). A status item is the
 ///   drop target; the app never auto-quits.
-/// - `.dock`: the legacy launch-on-drop Dock lifecycle — a drop wakes the
-///   process, it runs headless, and quits when the queue drains and no window
-///   is open.
 /// - `.onboarding`: no config yet; show the wizard window with a Dock icon.
-enum AppMode { case onboarding, menuBar, dock }
+enum AppMode { case onboarding, menuBar }
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate, ObservableObject {
@@ -23,7 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     let config = ConfigStore()
     private let runner = PythonRunner()
 
-    private var mode: AppMode = .dock
+    private var mode: AppMode = .menuBar
     private var statusController: StatusItemController?
 
     /// Notification category + action identifiers for the post-archive
@@ -52,19 +49,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         )
     }
 
-    /// Number of in-progress drop-processing batches (drives the Dock-mode
-    /// quit decision, and the menu-bar busy spinner).
+    /// Number of in-progress drop-processing batches (drives the menu-bar
+    /// busy spinner).
     private var activeTasks = 0 {
         didSet {
             guard (oldValue == 0) != (activeTasks == 0) else { return }
             statusController?.setBusy(activeTasks > 0)
         }
     }
-    /// A drop initiated this launch — Dock mode runs headless and quits when done.
-    private var launchedViaDrop = false
-    /// The management window is up. Source of truth for "is the main window
-    /// open" in Dock mode.
-    private var managementActive = false
     private weak var mainWindow: NSWindow?
     /// Strong ref in menu-bar mode so the single window survives being closed
     /// and can be re-shown when the icon is clicked again (a weak ref would go
@@ -100,10 +92,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         center.setNotificationCategories([Self.archivedCategory()])
         center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
 
-        NotificationCenter.default.addObserver(
-            self, selector: #selector(mainWindowWillClose(_:)),
-            name: NSWindow.willCloseNotification, object: nil)
-        // Onboarding (or Settings) can change the mode at runtime.
+        // Onboarding completion flips the app into menu-bar mode.
         NotificationCenter.default.addObserver(
             self, selector: #selector(configChanged),
             name: .dropItDownConfigChanged, object: nil)
@@ -121,36 +110,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             .appendingPathComponent("Library/Application Support/DropItDown/config.toml")
     }
 
-    /// Read `menu_bar_enabled` straight from config.toml (no subprocess, so
-    /// it's instant at launch). Missing file ⇒ onboarding; missing key ⇒
-    /// menu-bar (the shipping default).
+    /// No config file ⇒ onboarding; otherwise the resident menu-bar agent.
+    /// (Checked without a subprocess so launch is instant.)
     private func determineMode() -> AppMode {
-        let path = configPath()
-        guard FileManager.default.fileExists(atPath: path.path) else { return .onboarding }
-        if let text = try? String(contentsOf: path, encoding: .utf8) {
-            for raw in text.split(separator: "\n") {
-                let line = raw.trimmingCharacters(in: .whitespaces)
-                if line.hasPrefix("menu_bar_enabled") {
-                    return line.contains("false") ? .dock : .menuBar
-                }
-            }
-        }
-        return .menuBar
+        FileManager.default.fileExists(atPath: configPath().path) ? .menuBar : .onboarding
     }
 
+    /// Onboarding finished (config.toml now exists) — become the resident
+    /// menu-bar agent.
     @objc private func configChanged() {
         let newMode = determineMode()
         guard newMode != mode else { return }
         log.info("mode change \(String(describing: self.mode)) → \(String(describing: newMode))")
         mode = newMode
-        switch newMode {
-        case .menuBar:
+        if newMode == .menuBar {
             NSApp.setActivationPolicy(.accessory)
             installStatusItem()
-        case .dock, .onboarding:
-            NSApp.setActivationPolicy(.regular)
-            statusController?.remove()
-            statusController = nil
         }
     }
 
@@ -177,7 +152,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         mainWindow = window
         switch mode {
         case .onboarding:
-            managementActive = true
             revealWindow()
         case .menuBar:
             // Resident: keep the window across closes, hidden until summoned.
@@ -185,14 +159,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             retainedWindow = window
             window.alphaValue = 0
             window.orderOut(nil)
-        case .dock:
-            if launchedViaDrop && !managementActive {
-                window.alphaValue = 0
-                window.orderOut(nil)
-            } else {
-                managementActive = true
-                revealWindow()
-            }
         }
     }
 
@@ -204,7 +170,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     /// Menu-bar "Open" — bring the resident window to the front.
     private func openMainWindow() {
-        managementActive = true
         NSApp.activate(ignoringOtherApps: true)
         // Prefer the retained window (menu-bar mode keeps a strong ref so it
         // survives closing).
@@ -235,19 +200,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         prefsWindow?.makeKeyAndOrderFront(nil)
     }
 
-    @objc private func mainWindowWillClose(_ note: Notification) {
-        guard let closed = note.object as? NSWindow, closed === mainWindow else { return }
-        managementActive = false
-        // In menu-bar mode the app stays resident; only Dock mode may quit.
-        DispatchQueue.main.async { [weak self] in self?.evaluateTermination() }
-    }
-
-    // MARK: - Open-documents (Finder "Open With" / Dock drop in legacy mode)
+    // MARK: - Open-documents (Finder "Open With")
 
     @objc private func handleOpenDocuments(_ event: NSAppleEventDescriptor, withReplyEvent: NSAppleEventDescriptor) {
         let urls = Self.fileURLs(from: event)
         guard !urls.isEmpty else { return }
-        if mode == .dock && !managementActive { launchedViaDrop = true }
         runDrop(urls: urls, action: nil)   // nil ⇒ configured default action
     }
 
@@ -264,59 +221,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     // MARK: - Running a drop
 
-    /// Entry point for every drop. `action == nil` uses the configured default.
-    /// The `instruct` action first prompts for a one-line instruction.
+    /// Entry point for every drop. `action == nil` uses the configured
+    /// default. No prompts on the drop path: dropped folders are archived
+    /// whole (one folder, one note) — `--folder-mode` on the CLI overrides.
     private func runDrop(urls: [URL], action: DropAction?) {
         let resolved = action ?? currentDefaultAction()
-
-        // The file-archiving actions ask, once per drop, how to treat any
-        // dropped directories (whole vs. expand). Copy-Markdown skips this.
-        var folderMode: String? = nil
-        if resolved == .archive || resolved == .noteOnly || resolved == .instruct,
-           urls.contains(where: Self.isDirectory) {
-            guard let mode = promptFolderMode() else { evaluateTermination(); return }
-            folderMode = mode
-        }
-
-        if resolved == .instruct {
-            promptInstruction { [weak self] note in
-                guard let self, let note, !note.isEmpty else {
-                    self?.evaluateTermination(); return
-                }
-                self.beginDrop(urls: urls, action: .instruct, instruction: note, folderMode: folderMode)
-            }
-        } else {
-            beginDrop(urls: urls, action: resolved, instruction: nil, folderMode: folderMode)
-        }
-    }
-
-    private static func isDirectory(_ url: URL) -> Bool {
-        (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
-    }
-
-    private func beginDrop(urls: [URL], action: DropAction, instruction: String?, folderMode: String?) {
         activeTasks += 1
         Task {
-            await processDrop(urls: urls, action: action, instruction: instruction, folderMode: folderMode)
+            await processDrop(urls: urls, action: resolved)
             activeTasks -= 1
-            evaluateTermination()
         }
     }
 
-    private func processDrop(urls: [URL], action: DropAction, instruction: String?, folderMode: String?) async {
+    private func processDrop(urls: [URL], action: DropAction) async {
         let paths = urls.map(\.path)
         switch action {
-        case .archive, .instruct:
-            let results = await runner.process(files: paths, move: true, folderMode: folderMode)
-            if action == .instruct, let note = instruction {
-                for r in results where r.recordID != nil {
-                    _ = await runner.runCLI(["fix", note, "--id", String(r.recordID!)])
-                }
-            }
-            history.refresh()
-            for r in results { await notify(result: r) }
-        case .noteOnly:
-            let results = await runner.process(files: paths, move: false, folderMode: folderMode)
+        case .archive, .noteOnly:
+            let results = await runner.process(files: paths, move: action == .archive,
+                                               folderMode: "whole")
             history.refresh()
             for r in results { await notify(result: r) }
         case .copyMD:
@@ -326,52 +248,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 body: paths.count == 1
                     ? "\(URL(fileURLWithPath: paths[0]).lastPathComponent) is on the clipboard"
                     : "\(paths.count) items on the clipboard")
-        }
-    }
-
-    /// Ask how to file dropped folders. Returns "whole", "expand", or nil
-    /// (cancelled). Shown once per drop when any item is a directory.
-    private func promptFolderMode() -> String? {
-        let alert = NSAlert()
-        alert.messageText = "This drop includes a folder"
-        alert.informativeText = "Archive each folder as a single item, or expand it and file every file inside separately?"
-        alert.addButton(withTitle: "Archive as one")
-        alert.addButton(withTitle: "Expand & file each")
-        alert.addButton(withTitle: "Cancel")
-        NSApp.activate(ignoringOtherApps: true)
-        switch alert.runModal() {
-        case .alertFirstButtonReturn:  return "whole"
-        case .alertSecondButtonReturn: return "expand"
-        default:                       return nil
-        }
-    }
-
-    /// Ask for a one-line instruction via a modal alert. Returns nil if cancelled.
-    private func promptInstruction(_ completion: @escaping (String?) -> Void) {
-        let alert = NSAlert()
-        alert.messageText = "Tell the AI what to do"
-        alert.informativeText = "A one-line instruction, e.g. “file under Receipts/2024”."
-        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 280, height: 24))
-        field.placeholderString = "Instruction"
-        alert.accessoryView = field
-        alert.addButton(withTitle: "Run")
-        alert.addButton(withTitle: "Cancel")
-        NSApp.activate(ignoringOtherApps: true)
-        let response = alert.runModal()
-        if response == .alertFirstButtonReturn {
-            completion(field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines))
-        } else {
-            completion(nil)
-        }
-    }
-
-    // MARK: - Termination
-
-    private func evaluateTermination() {
-        guard mode == .dock else { return }   // menu-bar / onboarding stay resident
-        if activeTasks == 0 && !managementActive {
-            log.info("no tasks, no window — terminating")
-            NSApp.terminate(nil)
         }
     }
 
@@ -385,7 +261,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
-    func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool { mode != .menuBar }
+    func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool { mode == .onboarding }
 
     // MARK: - Notifications
 
@@ -436,8 +312,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private enum RecordAction { case undo, fix }
 
     /// Run an `undo`/`fix` CLI invocation from a notification action, then post
-    /// a confirmation. Counted as a task so a process launched only to service
-    /// the action stays alive (Dock mode) until done.
+    /// a confirmation. Counted as a task so the menu-bar spinner reflects it.
     @MainActor
     private func runRecordAction(_ args: [String], recordID: Int, kind: RecordAction) async {
         activeTasks += 1
@@ -445,7 +320,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         history.refresh()
         await postActionFollowup(recordID: recordID, kind: kind, ok: code == 0)
         activeTasks -= 1
-        evaluateTermination()
     }
 
     @MainActor

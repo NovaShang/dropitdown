@@ -3,17 +3,16 @@ import SwiftUI
 
 /// First-run setup wizard. Shown by `RootView` when no config.toml exists.
 ///
-/// Kept deliberately small — two real decisions only: the folders, and *where
-/// DropItDown lives* (menu bar vs Dock). The drop action defaults to Archive
-/// and is left for Settings, so the wizard never has to explain lifecycle or
-/// per-drop choices. When it finishes, `config.needsSetup` flips false and
-/// `RootView` swaps in the real UI.
+/// Kept deliberately small — the folders, and an optional API key for AI
+/// filing. The drop action defaults to Archive and is left for Settings.
+/// When it finishes, `config.needsSetup` flips false and `RootView` swaps in
+/// the real UI; the app becomes the resident menu-bar agent.
 struct OnboardingView: View {
     @EnvironmentObject var config: ConfigStore
 
     @State private var archiveRoot = "~/Documents/Archive"
     @State private var mdRoot = "~/Documents/Notes"
-    @State private var menuBarEnabled = true
+    @State private var apiKey = ""
     @State private var launchAtLogin = false
     @State private var saving = false
 
@@ -28,8 +27,7 @@ struct OnboardingView: View {
             VStack(alignment: .leading, spacing: 26) {
                 header
                 foldersSection
-                homeSection
-                quotaNote
+                keySection
                 startBar
             }
             .frame(maxWidth: 620)
@@ -67,46 +65,28 @@ struct OnboardingView: View {
         }
     }
 
-    // MARK: - Where DropItDown lives
+    // MARK: - AI key (BYOK)
 
-    private var homeSection: some View {
-        OnboardingGroup(title: "Where to drop files", systemImage: "hand.point.up.left") {
-            HomeCard(
-                title: "Live in the menu bar",
-                badge: "Recommended",
-                systemImage: "menubar.rectangle",
-                detail: "Always ready in the background. Drop files on the menu-bar icon — hold the drag a moment to choose how to file them.",
-                selected: menuBarEnabled
-            ) { menuBarEnabled = true }
-
-            HomeCard(
-                title: "Just a Dock app",
-                badge: nil,
-                systemImage: "dock.rectangle",
-                detail: "No background app. Drop files on its Dock icon. Tip: keep DropItDown in your Dock so it's always a drop away.",
-                selected: !menuBarEnabled
-            ) { menuBarEnabled = false }
-
+    private var keySection: some View {
+        OnboardingGroup(title: "AI filing", systemImage: "sparkles") {
+            HStack(spacing: 10) {
+                Text("API key")
+                    .font(.callout)
+                    .frame(width: 64, alignment: .leading)
+                SecureField("sk-…  (DeepSeek or any OpenAI-compatible key)", text: $apiKey)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.callout.monospaced())
+            }
+            Text("Classification runs on your own key (DeepSeek by default — endpoint and model are changeable in Settings). You can also add it later, but drops won't be filed until a key is set.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.leading, 74)
+                .fixedSize(horizontal: false, vertical: true)
             Toggle(isOn: $launchAtLogin) {
                 Text("Launch at login")
             }
             .padding(.top, 2)
         }
-    }
-
-    private var quotaNote: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "sparkles")
-                .foregroundStyle(.tint)
-            Text("Classification is ready out of the box with a free monthly quota — no API key needed. You can switch to your own key later in Settings.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.tint.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     // MARK: - Start
@@ -136,7 +116,7 @@ struct OnboardingView: View {
                 archiveRoot: archiveRoot.trimmingCharacters(in: .whitespaces),
                 mdRoot: mdRoot.trimmingCharacters(in: .whitespaces),
                 dropAction: "archive",          // sensible default; tweak in Settings
-                menuBar: menuBarEnabled,
+                apiKey: apiKey.trimmingCharacters(in: .whitespaces),
                 launchAtLogin: launchAtLogin
             )
             LoginItem.set(launchAtLogin)
@@ -158,58 +138,6 @@ extension Notification.Name {
 }
 
 // MARK: - Building blocks
-
-/// A selectable "where DropItDown lives" card: icon, title (+ optional badge),
-/// one-line description, radio dot.
-private struct HomeCard: View {
-    let title: String
-    let badge: String?
-    let systemImage: String
-    let detail: String
-    let selected: Bool
-    let onTap: () -> Void
-
-    var body: some View {
-        Button(action: onTap) {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: systemImage)
-                    .font(.title2)
-                    .foregroundStyle(selected ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
-                    .frame(width: 30)
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
-                        Text(title).font(.callout.weight(.semibold))
-                        if let badge {
-                            Text(badge)
-                                .font(.caption2.weight(.semibold))
-                                .padding(.horizontal, 6).padding(.vertical, 1)
-                                .background(.tint.opacity(0.15))
-                                .clipShape(Capsule())
-                                .foregroundStyle(.tint)
-                        }
-                    }
-                    Text(detail)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 8)
-                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(selected ? AnyShapeStyle(.tint) : AnyShapeStyle(.quaternary))
-            }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(selected ? AnyShapeStyle(.tint.opacity(0.10)) : AnyShapeStyle(.quaternary.opacity(0.30)))
-            .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(selected ? AnyShapeStyle(.tint) : AnyShapeStyle(.clear), lineWidth: 1.5)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-}
 
 /// Section container matching the onboarding's spacing / card style.
 private struct OnboardingGroup<Content: View>: View {

@@ -4,14 +4,10 @@ struct AppConfig: Codable {
     var inbox: String
     var archiveRoot: String
     var mdRoot: String
-    var classificationMode: String
     var dropAction: String
-    var menuBarEnabled: Bool
     var launchAtLogin: Bool
     var model: String
     var baseURL: String
-    var proxyURL: String
-    var deviceID: String
     var hasAPIKey: Bool
     var maxContentChars: Int
     var cuEndpoint: String
@@ -23,14 +19,10 @@ struct AppConfig: Codable {
         case inbox
         case archiveRoot = "archive_root"
         case mdRoot = "md_root"
-        case classificationMode = "classification_mode"
         case dropAction = "drop_action"
-        case menuBarEnabled = "menu_bar_enabled"
         case launchAtLogin = "launch_at_login"
         case model
         case baseURL = "base_url"
-        case proxyURL = "proxy_url"
-        case deviceID = "device_id"
         case hasAPIKey = "has_api_key"
         case maxContentChars = "max_content_chars"
         case cuEndpoint = "cu_endpoint"
@@ -45,14 +37,10 @@ struct AppConfig: Codable {
         inbox = try c.decode(String.self, forKey: .inbox)
         archiveRoot = try c.decode(String.self, forKey: .archiveRoot)
         mdRoot = try c.decode(String.self, forKey: .mdRoot)
-        classificationMode = try c.decode(String.self, forKey: .classificationMode)
         dropAction = try c.decodeIfPresent(String.self, forKey: .dropAction) ?? "archive"
-        menuBarEnabled = try c.decodeIfPresent(Bool.self, forKey: .menuBarEnabled) ?? true
         launchAtLogin = try c.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? false
         model = try c.decode(String.self, forKey: .model)
         baseURL = try c.decode(String.self, forKey: .baseURL)
-        proxyURL = try c.decode(String.self, forKey: .proxyURL)
-        deviceID = try c.decode(String.self, forKey: .deviceID)
         hasAPIKey = try c.decode(Bool.self, forKey: .hasAPIKey)
         maxContentChars = try c.decode(Int.self, forKey: .maxContentChars)
         cuEndpoint = try c.decode(String.self, forKey: .cuEndpoint)
@@ -62,14 +50,13 @@ struct AppConfig: Codable {
     }
 }
 
-/// The four things a drop can do. Shared by the onboarding wizard, the
-/// Behavior settings, and (step 3) the menu-bar drop panel. The raw value is
-/// exactly the token the `process`/`copy-md` CLI expects.
+/// The three things a drop can do. Shared by the Behavior settings and the
+/// menu-bar drop panel. The raw value is exactly the token the
+/// `process`/`copy-md` CLI expects.
 enum DropAction: String, CaseIterable, Identifiable {
     case archive
     case noteOnly = "note_only"
     case copyMD = "copy_md"
-    case instruct
 
     var id: String { rawValue }
 
@@ -78,7 +65,6 @@ enum DropAction: String, CaseIterable, Identifiable {
         case .archive:  return "Archive"
         case .noteOnly: return "Note only"
         case .copyMD:   return "Copy Markdown"
-        case .instruct: return "Ask AI"
         }
     }
 
@@ -87,7 +73,6 @@ enum DropAction: String, CaseIterable, Identifiable {
         case .archive:  return "Convert, classify, file the original, write a note"
         case .noteOnly: return "Write a note but leave the original in place"
         case .copyMD:   return "Convert to Markdown on the clipboard, save nothing"
-        case .instruct: return "Type a one-line instruction, then archive"
         }
     }
 
@@ -96,7 +81,6 @@ enum DropAction: String, CaseIterable, Identifiable {
         case .archive:  return "tray.and.arrow.down"
         case .noteOnly: return "note.text"
         case .copyMD:   return "doc.on.clipboard"
-        case .instruct: return "text.bubble"
         }
     }
 
@@ -142,12 +126,14 @@ final class ConfigStore: ObservableObject {
     /// success. `dropAction` is a `DropAction.rawValue`.
     @discardableResult
     func setup(archiveRoot: String, mdRoot: String, dropAction: String,
-               menuBar: Bool, launchAtLogin: Bool) async -> Bool {
+               apiKey: String, launchAtLogin: Bool) async -> Bool {
         var args = ["setup",
                     "--archive-root", archiveRoot,
                     "--md-root", mdRoot,
                     "--drop-action", dropAction]
-        args.append(menuBar ? "--menu-bar" : "--no-menu-bar")
+        if !apiKey.isEmpty {
+            args += ["--api-key", apiKey]
+        }
         args.append(launchAtLogin ? "--launch-at-login" : "--no-launch-at-login")
         let (_, code) = await runner.runCLI(args)
         await reload()

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import secrets
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -11,30 +10,10 @@ CONFIG_DIR = APP_SUPPORT_DIR
 DATA_DIR = APP_SUPPORT_DIR
 CONFIG_PATH = CONFIG_DIR / "config.toml"
 JOURNAL_PATH = DATA_DIR / "journal.db"
-DEVICE_ID_PATH = APP_SUPPORT_DIR / "device_id"
-
-# Default hosted proxy URL — when no api_key is configured, the app talks
-# here using a per-device token. The proxy is OpenAI-compatible. The `/v1`
-# suffix is required: the OpenAI client posts to `<base_url>/chat/completions`
-# verbatim, and the worker only serves `/v1/chat/completions`.
-DEFAULT_PROXY_URL = "https://dropitdown-proxy.styleshang.workers.dev/v1"
 
 # Legacy paths from the early CLI days; migrated on first run.
 _LEGACY_CONFIG_DIR = Path(os.path.expanduser("~/.config/dropitdown"))
 _LEGACY_DATA_DIR = Path(os.path.expanduser("~/.local/share/dropitdown"))
-
-
-def load_or_create_device_id() -> str:
-    """Read the persisted device_id, generating one on first use."""
-    APP_SUPPORT_DIR.mkdir(parents=True, exist_ok=True)
-    if DEVICE_ID_PATH.exists():
-        existing = DEVICE_ID_PATH.read_text().strip()
-        if existing:
-            return existing
-    new_id = secrets.token_urlsafe(24)  # ~192 bits of entropy
-    DEVICE_ID_PATH.write_text(new_id)
-    os.chmod(DEVICE_ID_PATH, 0o600)
-    return new_id
 
 
 def migrate_from_legacy() -> list[str]:
@@ -75,23 +54,17 @@ class Config:
     inbox: Path
     archive_root: Path
     md_root: Path
+    # BYOK: any OpenAI-compatible endpoint. Key comes from config.toml or the
+    # DEEPSEEK_API_KEY env var.
     api_key: str
     base_url: str = "https://api.deepseek.com"
     model: str = "deepseek-chat"
     max_content_chars: int = 8000
-    # `hosted` (default) talks to the DropItDown proxy with a device token —
-    # you get N free classifications/month, no setup. `byok` calls the
-    # configured `base_url` directly with your `api_key`.
-    classification_mode: str = "hosted"
-    proxy_url: str = ""
-    device_id: str = ""
     # Behavior / UX. `drop_action` is what a plain drop does (and the default
-    # action of the menu-bar panel): archive | note_only | copy_md | instruct.
-    # `menu_bar_enabled` selects the resident menu-bar agent over the legacy
-    # launch-on-drop Dock lifecycle. `launch_at_login` mirrors the macOS
-    # login-item registration for the settings UI.
+    # action of the menu-bar panel): archive | note_only | copy_md.
+    # `launch_at_login` mirrors the macOS login-item registration for the
+    # settings UI.
     drop_action: str = "archive"
-    menu_bar_enabled: bool = True
     launch_at_login: bool = False
     # Azure Content Understanding (optional). Auth resolves in this order:
     #   AZURE_API_KEY env var → DefaultAzureCredential (az login).
@@ -114,47 +87,19 @@ class Config:
         with CONFIG_PATH.open("rb") as f:
             data = tomllib.load(f)
 
-        # Resolve classification mode. Hosted is the default; BYOK is
-        # auto-selected when the user has set a custom api_key.
-        explicit_mode = data.get("classification_mode", "").lower()
-        user_api_key = data.get("api_key") or os.environ.get("DEEPSEEK_API_KEY", "")
-        if explicit_mode in ("hosted", "byok"):
-            mode = explicit_mode
-        else:
-            mode = "byok" if user_api_key else "hosted"
-
-        if mode == "hosted":
-            proxy_url = data.get("proxy_url") or DEFAULT_PROXY_URL
-            device_id = data.get("device_id") or load_or_create_device_id()
-            # Classify code paths use base_url + api_key uniformly — point
-            # them at the proxy + device token so they're unaware of mode.
-            effective_base = proxy_url
-            effective_key = device_id
-            effective_model = data.get("model", "deepseek-chat")
-        else:
-            proxy_url = ""
-            device_id = ""
-            effective_base = data.get("base_url", "https://api.deepseek.com")
-            effective_key = user_api_key
-            effective_model = data.get("model", "deepseek-chat")
-
         return cls(
             inbox=Path(os.path.expanduser(data["inbox"])),
             archive_root=Path(os.path.expanduser(data["archive_root"])),
             md_root=Path(os.path.expanduser(data["md_root"])),
-            api_key=effective_key,
-            base_url=effective_base,
-            model=effective_model,
+            api_key=data.get("api_key") or os.environ.get("DEEPSEEK_API_KEY", ""),
+            base_url=data.get("base_url", "https://api.deepseek.com"),
+            model=data.get("model", "deepseek-chat"),
             max_content_chars=int(data.get("max_content_chars", 8000)),
-            classification_mode=mode,
-            proxy_url=proxy_url,
-            device_id=device_id,
             cu_endpoint=data.get("cu_endpoint", ""),
             cu_api_key=data.get("cu_api_key", "") or os.environ.get("AZURE_API_KEY", ""),
             cu_analyzer_id=data.get("cu_analyzer_id", ""),
             cu_file_types=[str(t).lower().lstrip(".") for t in data.get("cu_file_types", [])],
             drop_action=str(data.get("drop_action", "archive")),
-            menu_bar_enabled=bool(data.get("menu_bar_enabled", True)),
             launch_at_login=bool(data.get("launch_at_login", False)),
         )
 
@@ -166,9 +111,8 @@ def write_config(cfg: dict) -> None:
     for key in str_keys:
         if key in cfg:
             lines.append(f'{key} = "{cfg[key]}"')
-    for key in ["menu_bar_enabled", "launch_at_login"]:
-        if key in cfg:
-            lines.append(f"{key} = {str(bool(cfg[key])).lower()}")
+    if "launch_at_login" in cfg:
+        lines.append(f"launch_at_login = {str(bool(cfg['launch_at_login'])).lower()}")
     if "max_content_chars" in cfg:
         lines.append(f"max_content_chars = {cfg['max_content_chars']}")
     CONFIG_PATH.write_text("\n".join(lines) + "\n")

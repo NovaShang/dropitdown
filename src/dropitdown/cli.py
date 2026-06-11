@@ -67,24 +67,26 @@ def setup(
     archive_root: str = typer.Option(..., help="Where original files are filed."),
     md_root: str = typer.Option(..., help="Where Markdown notes are written."),
     inbox: str = typer.Option("~/DropItDown", help="Watched inbox / undo restore dir."),
-    drop_action: str = typer.Option("archive", help="archive | note_only | copy_md | instruct"),
-    menu_bar: bool = typer.Option(True, "--menu-bar/--no-menu-bar", help="Resident menu-bar agent vs Dock lifecycle."),
+    drop_action: str = typer.Option("archive", help="archive | note_only | copy_md"),
+    api_key: str = typer.Option("", help="OpenAI-compatible API key (BYOK). Can be set later."),
     launch_at_login: bool = typer.Option(False, "--launch-at-login/--no-launch-at-login"),
 ) -> None:
     """Non-interactive first-run setup, written for the GUI onboarding wizard.
-    Creates config.toml in hosted mode (free quota, no API key needed) and the
-    target folders. Idempotent — overwrites an existing config."""
+    Creates config.toml and the target folders. Idempotent — overwrites an
+    existing config."""
     for p in (inbox, archive_root, md_root):
         Path(os.path.expanduser(p)).mkdir(parents=True, exist_ok=True)
-    write_config({
+    cfg: dict = {
         "inbox": inbox,
         "archive_root": archive_root,
         "md_root": md_root,
         "drop_action": drop_action,
-        "menu_bar_enabled": menu_bar,
         "launch_at_login": launch_at_login,
         "max_content_chars": 8000,
-    })
+    }
+    if api_key:
+        cfg["api_key"] = api_key
+    write_config(cfg)
     ignore.load()  # seed ignore file with defaults
     console.print(f"[green]Wrote[/green] {CONFIG_PATH}")
 
@@ -401,15 +403,11 @@ def config_show(
             "inbox": str(cfg.inbox),
             "archive_root": str(cfg.archive_root),
             "md_root": str(cfg.md_root),
-            "classification_mode": cfg.classification_mode,
             "drop_action": cfg.drop_action,
-            "menu_bar_enabled": cfg.menu_bar_enabled,
             "launch_at_login": cfg.launch_at_login,
             "model": cfg.model,
             "base_url": cfg.base_url,
-            "proxy_url": cfg.proxy_url,
-            "device_id": cfg.device_id,
-            "has_api_key": bool(cfg.api_key) and cfg.classification_mode == "byok",
+            "has_api_key": bool(cfg.api_key),
             "max_content_chars": cfg.max_content_chars,
             "cu_endpoint": cfg.cu_endpoint,
             "cu_analyzer_id": cfg.cu_analyzer_id,
@@ -421,12 +419,7 @@ def config_show(
     console.print(f"  inbox        {cfg.inbox}")
     console.print(f"  archive      {cfg.archive_root}")
     console.print(f"  md           {cfg.md_root}")
-    console.print(f"  mode         {cfg.classification_mode}")
-    if cfg.classification_mode == "hosted":
-        console.print(f"  proxy        {cfg.proxy_url}")
-        console.print(f"  device       {cfg.device_id[:12]}…")
-    else:
-        console.print(f"  model        {cfg.model} @ {cfg.base_url}")
+    console.print(f"  model        {cfg.model} @ {cfg.base_url}")
 
 
 @config_app.command("set")
@@ -447,7 +440,7 @@ def config_set(
     # the Swift settings UI can set list/int values without corrupting them.
     list_keys = {"cu_file_types"}
     int_keys = {"max_content_chars"}
-    bool_keys = {"menu_bar_enabled", "launch_at_login"}
+    bool_keys = {"launch_at_login"}
     if key in list_keys:
         data[key] = [
             part.strip().lstrip(".").lower()
@@ -496,15 +489,10 @@ def status() -> None:
     console.print(f"  inbox        {cfg.inbox}")
     console.print(f"  archive      {cfg.archive_root}")
     console.print(f"  md           {cfg.md_root}")
-    console.print(f"  mode         [cyan]{cfg.classification_mode}[/cyan]")
-    if cfg.classification_mode == "hosted":
-        console.print(f"  proxy        {cfg.proxy_url}")
-        console.print(f"  device       {cfg.device_id[:12]}…")
-    else:
-        console.print(f"  model        {cfg.model} @ {cfg.base_url}")
-        console.print(f"  api_key      {'set' if cfg.api_key else '[red]missing[/red]'}")
+    console.print(f"  model        {cfg.model} @ {cfg.base_url}")
+    console.print(f"  api_key      {'set' if cfg.api_key else '[red]missing[/red]'}")
     console.print()
-    history(n=10)
+    history(n=10, json_out=False)
 
 
 def _load_config_or_die() -> Config:
