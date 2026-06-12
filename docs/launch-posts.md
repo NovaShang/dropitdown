@@ -22,7 +22,7 @@ Replace `LINK` with the site (e.g. `https://novashang.com/dropitdown`) and `REPO
 >
 > It's **BYOK** — classification runs on your own key (DeepSeek, OpenAI, Claude, any OpenAI-compatible endpoint). No account, no server, your files stay on your Mac. Native SwiftUI, open source.
 >
-> Honest caveats: macOS 14+ / Apple Silicon, and the download is chunky (~400MB) because it bundles a full offline MarkItDown pipeline so there's nothing to install. Would love feedback on what file types you'd throw at it. — Nova
+> Honest caveats: macOS 14+ / Apple Silicon, and it's a ~190MB download (bundles a full offline MarkItDown pipeline so there's nothing to install). Would love feedback on what file types you'd throw at it. — Nova
 
 ---
 
@@ -69,6 +69,6 @@ Replace `LINK` with the site (e.g. `https://novashang.com/dropitdown`) and `REPO
 ## Comment-section FAQ prep
 
 - **"Why not just upload the file to ChatGPT?"** Many agents/contexts only take text (Cursor, the terminal, web forms). Local conversion is instant, private, offline, and you keep a reusable Markdown copy your agent can re-read and search — you don't re-upload each time.
-- **"400MB for this?"** It bundles a full offline MarkItDown pipeline (pandas/onnxruntime/…) so there's nothing to install and it works offline. A leaner OCR-only path could hit ~100MB; on the roadmap.
+- **"That's a big download?"** ~190MB (compressed DMG; ~385MB installed). It bundles a full offline MarkItDown pipeline (pandas/onnxruntime/…) so there's nothing to install and it works offline. A leaner OCR-only path could shrink it; on the roadmap.
 - **"DeepSeek?"** It's BYOK — DeepSeek is just the default `base_url`. Point it at OpenAI, Anthropic, or any OpenAI-compatible endpoint. Conversion never calls a model; only the folder/summary step does, on your key.
 - **"Privacy?"** Originals and notes stay in your folders. Only a short text excerpt is sent for classification, to your own provider. No account, no server, no telemetry.

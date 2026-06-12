@@ -21,7 +21,7 @@ Effort key: **S** ≤1h · **M** a few hours · **L** a day+
 
 ## P0 — blockers (ship-breaking or embarrassing)
 
-- [ ] **Notarized, Developer-ID-signed DMG** — **M**. *(Only the user can run this — needs Apple creds / a CI release tag.)* Run `build.sh` + `sign-and-notarize.sh`, verify notifications work on the notarized build. The DMG now ships a drag-to-`/Applications` layout.
+- [x] **Notarized, Developer-ID-signed DMG** — **shipped as v0.4.0** (CI release run 27448692950, 5m53s). Published GitHub Release with `DropItDown.dmg` + `DropItDown-v0.4.0.dmg` (191 MB download / ~385 MB installed); `releases/latest/download/DropItDown.dmg` returns 200. Drag-to-`/Applications` layout included. *Still verify notifications fire on the installed notarized build.*
 - [x] **Summary language → configurable, default English** — `summary_language` config key (default English; user's own config set to Chinese). Editable in Settings → Classification. Verified: English summary on a fresh config.
 - [x] **No-key first run isn't confusing** — `process` now emits a helpful per-file error ("add a key in Settings, or use Copy as Markdown") that reaches the macOS notification, instead of dying silently.
 
