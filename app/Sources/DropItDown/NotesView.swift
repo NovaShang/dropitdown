@@ -6,20 +6,22 @@ import AppKit
 struct NotesView: View {
     @EnvironmentObject var config: ConfigStore
     @AppStorage("notes.sidebarWidth") private var sidebarWidth = 260.0
-    @State private var rootURL: URL?
     @State private var selected: URL?
     @State private var noteText: String = ""
+
+    /// Derived straight from the live config — a stored copy synced via
+    /// .task(id:) missed updates when the window was created hidden (menu-bar
+    /// mode), leaving the tree stuck on "No vault configured".
+    private var rootURL: URL? {
+        guard let path = config.config?.mdRoot, !path.isEmpty else { return nil }
+        return URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
+    }
 
     var body: some View {
         SidebarSplit(width: $sidebarWidth, minWidth: 200, maxWidth: 460) {
             tree
         } detail: {
             preview
-        }
-        .task(id: config.config?.mdRoot) {
-            if let path = config.config?.mdRoot {
-                rootURL = URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
-            }
         }
         .onChange(of: selected) { _, newValue in
             loadNote(url: newValue)
