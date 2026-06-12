@@ -68,7 +68,14 @@ struct OnboardingView: View {
     // MARK: - AI key (BYOK)
 
     private var keySection: some View {
-        OnboardingGroup(title: "AI filing", systemImage: "sparkles") {
+        OnboardingGroup(title: "AI filing — bring your own key", systemImage: "sparkles") {
+            // Set expectations up front: filing needs a key; the local
+            // Copy-as-Markdown action doesn't. DropItDown never hosts a model.
+            Text("**Filing runs on your own API key** — DropItDown never hosts a model. Without a key you can still drop a file to *Copy as Markdown* (a free, local conversion), but sorting files into folders needs one.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
             HStack(spacing: 10) {
                 Text("API key")
                     .font(.callout)
@@ -77,15 +84,26 @@ struct OnboardingView: View {
                     .textFieldStyle(.roundedBorder)
                     .font(.callout.monospaced())
             }
-            Text("Classification runs on your own key (DeepSeek by default — endpoint and model are changeable in Settings). You can also add it later, but drops won't be filed until a key is set.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(.leading, 74)
-                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 6) {
+                Image(systemName: apiKey.isEmpty ? "info.circle" : "checkmark.circle.fill")
+                    .foregroundStyle(apiKey.isEmpty ? AnyShapeStyle(.secondary) : AnyShapeStyle(.green))
+                if apiKey.isEmpty {
+                    Text("No key yet? Filing stays off until you add one in Settings.")
+                        .foregroundStyle(.secondary)
+                    Link("Get a DeepSeek key →", destination: URL(string: "https://platform.deepseek.com/api_keys")!)
+                } else {
+                    Text("AI filing is ready. Endpoint and model are changeable in Settings.")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .font(.caption)
+            .padding(.leading, 74)
+
             Toggle(isOn: $launchAtLogin) {
                 Text("Launch at login")
             }
-            .padding(.top, 2)
+            .padding(.top, 4)
         }
     }
 
