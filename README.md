@@ -59,8 +59,15 @@ dropitdown init        # first-time setup
 dropitdown process file1.pdf file2.png
 dropitdown history
 dropitdown fix "this is an I-94, not a bill"
-dropitdown clean       # let the LLM trim ignore patterns
+dropitdown clean        # let the LLM trim ignore patterns
+dropitdown agent-skill  # write a CLAUDE.md so an agent can search the vault
 ```
+
+Filing classifies with your LLM key. Converting alone needs no key:
+`dropitdown copy-md <file>` puts the Markdown on the clipboard, and the
+default GUI drop also copies the written note's path so you can paste it
+straight into a coding agent. Summaries are written in `summary_language`
+(default English; set to `Chinese`, `日本語`, … in config or Settings).
 
 Configuration lives at `~/Library/Application Support/DropItDown/`:
 
@@ -85,6 +92,6 @@ Configuration lives at `~/Library/Application Support/DropItDown/`:
 
 ## Known limitations
 
-- Bundle size ~400 MB — most is MarkItDown's tail of deps (`pandas`, `onnxruntime`, `lxml`, `pdfminer`). Trimming to a CU-only fast path would cut it to ~100 MB; trade-off is losing offline format support.
-- Notification permission is requested on first launch but will be denied unless the app is signed with a Developer ID.
+- Bundle size ~400 MB — the cost of a self-contained, offline MarkItDown pipeline (`pandas`, `onnxruntime`, `lxml`, `pdfminer`). Nothing to install on the target machine; trimming to a CU-only fast path would cut it to ~100 MB at the cost of offline format support.
+- Notification permission is requested on first launch but will be denied unless the app is signed with a Developer ID (use the notarized release, not an ad-hoc local build).
 - macOS 14+ Sonoma only — pinned via `LSMinimumSystemVersion` and SwiftUI APIs.
