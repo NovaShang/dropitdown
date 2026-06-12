@@ -19,13 +19,13 @@ class Classification:
     cache_miss_tokens: int = 0
 
 
-SYSTEM_RULES = """You are a file archivist. Given a file's name, content excerpt, and the user's existing directory structure, decide where to file it and produce a one-sentence Chinese summary.
+SYSTEM_RULES = """You are a file archivist. Given a file's name, content excerpt, and the user's existing directory structure, decide where to file it and produce a one-sentence {language} summary.
 
 Rules:
 - Accuracy beats reuse. If the file genuinely belongs in an existing category, use it. If it doesn't clearly fit any existing one, confidently create a new category with a precise name — do not force it into a near-miss.
 - A document's type (bill, contract, ID, transcript, receipt, immigration form, ...) must match the category. Don't sort by topic if the document type is different (e.g. an I-20 form is not a "Bill" just because it mentions money).
 - category_path is forward-slash separated, relative (no leading slash). Keep depth shallow (1-3 levels typically).
-- summary is one sentence, factual, in Chinese.
+- summary is one sentence, factual, written in {language}.
 
 Tree listing format:
 - Each line: `- path (Xd/Yf)` means X direct subdirs and Y direct files visible after ignore filtering.
@@ -51,7 +51,7 @@ CLASSIFY_TOOL = {
                 },
                 "summary": {
                     "type": "string",
-                    "description": "One-sentence Chinese summary of the file.",
+                    "description": "One-sentence summary of the file, in the language the system prompt specifies.",
                 },
                 "is_new_category": {
                     "type": "boolean",
@@ -130,7 +130,9 @@ ADD_IGNORE_TOOL = {
 }
 
 
-def _build_system(archive_listing: TreeListing, md_listing: TreeListing) -> str:
+def _build_system(
+    archive_listing: TreeListing, md_listing: TreeListing, language: str = "English"
+) -> str:
     arch = ignore.format_listing(archive_listing, "Archive root directories")
     md = ignore.format_listing(md_listing, "Markdown root directories")
     learned = rules.active_rules()
@@ -141,7 +143,8 @@ def _build_system(archive_listing: TreeListing, md_listing: TreeListing) -> str:
             "\nRules learned from past corrections (HARD constraints, follow exactly):\n"
             f"{bullets}\n"
         )
-    return f"{SYSTEM_RULES}{learned_section}\n{arch}\n\n{md}\n"
+    rules_text = SYSTEM_RULES.format(language=language)
+    return f"{rules_text}{learned_section}\n{arch}\n\n{md}\n"
 
 
 def classify(
@@ -153,7 +156,7 @@ def classify(
 ) -> Classification:
     client = OpenAI(api_key=cfg.api_key, base_url=cfg.base_url, timeout=60.0)
 
-    system_msg = _build_system(archive_listing, md_listing)
+    system_msg = _build_system(archive_listing, md_listing, cfg.summary_language)
     user_msg = f"Filename: {filename}\n\nContent excerpt:\n---\n{content}\n---"
 
     messages: list[dict] = [

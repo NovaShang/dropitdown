@@ -333,7 +333,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             content.body = kind == .undo ? "Undo failed" : "Correction failed"
         } else if kind == .undo {
             content.title = "Undone"
-            content.body = "Moved back to the inbox _review/ folder (note kept)"
+            content.body = "Original restored (note kept)"
         } else {
             let entries = await runner.fetchHistory(limit: 100)
             let category = entries.first { $0.id == recordID }?.category

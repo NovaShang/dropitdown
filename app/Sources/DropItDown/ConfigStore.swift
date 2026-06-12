@@ -9,6 +9,7 @@ struct AppConfig: Codable {
     var model: String
     var baseURL: String
     var hasAPIKey: Bool
+    var summaryLanguage: String
     var maxContentChars: Int
     var cuEndpoint: String
     var cuAnalyzerID: String
@@ -24,6 +25,7 @@ struct AppConfig: Codable {
         case model
         case baseURL = "base_url"
         case hasAPIKey = "has_api_key"
+        case summaryLanguage = "summary_language"
         case maxContentChars = "max_content_chars"
         case cuEndpoint = "cu_endpoint"
         case cuAnalyzerID = "cu_analyzer_id"
@@ -42,6 +44,7 @@ struct AppConfig: Codable {
         model = try c.decode(String.self, forKey: .model)
         baseURL = try c.decode(String.self, forKey: .baseURL)
         hasAPIKey = try c.decode(Bool.self, forKey: .hasAPIKey)
+        summaryLanguage = try c.decodeIfPresent(String.self, forKey: .summaryLanguage) ?? "English"
         maxContentChars = try c.decode(Int.self, forKey: .maxContentChars)
         cuEndpoint = try c.decode(String.self, forKey: .cuEndpoint)
         cuAnalyzerID = try c.decode(String.self, forKey: .cuAnalyzerID)
@@ -171,6 +174,12 @@ final class ConfigStore: ObservableObject {
     func setValue(_ key: String, _ value: String) async {
         _ = await runner.runCLI(["config", "set", key, value])
         refresh()
+    }
+
+    /// Write a CLAUDE.md into the vault (`--write`) or return the skill text
+    /// for the clipboard (`--print`). Returns (stdout, exitCode).
+    func runAgentSkill(write: Bool) async -> (String, Int32) {
+        await runner.runCLI(["agent-skill", write ? "--write" : "--print"])
     }
 
     /// Write several config keys in one shot, then refresh once. Each pair is

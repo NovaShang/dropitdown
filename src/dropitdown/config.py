@@ -60,6 +60,9 @@ class Config:
     base_url: str = "https://api.deepseek.com"
     model: str = "deepseek-chat"
     max_content_chars: int = 8000
+    # Language the one-sentence summaries are written in. Free-form (passed
+    # to the model verbatim): "English", "Chinese", "日本語", …
+    summary_language: str = "English"
     # Behavior / UX. `drop_action` is what a plain drop does (and the default
     # action of the menu-bar panel): archive | note_only | copy_md.
     # `launch_at_login` mirrors the macOS login-item registration for the
@@ -95,6 +98,7 @@ class Config:
             base_url=data.get("base_url", "https://api.deepseek.com"),
             model=data.get("model", "deepseek-chat"),
             max_content_chars=int(data.get("max_content_chars", 8000)),
+            summary_language=str(data.get("summary_language", "English")),
             cu_endpoint=data.get("cu_endpoint", ""),
             cu_api_key=data.get("cu_api_key", "") or os.environ.get("AZURE_API_KEY", ""),
             cu_analyzer_id=data.get("cu_analyzer_id", ""),
@@ -107,7 +111,7 @@ class Config:
 def write_config(cfg: dict) -> None:
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     lines: list[str] = []
-    str_keys = ["inbox", "archive_root", "md_root", "api_key", "base_url", "model", "drop_action"]
+    str_keys = ["inbox", "archive_root", "md_root", "api_key", "base_url", "model", "drop_action", "summary_language"]
     for key in str_keys:
         if key in cfg:
             lines.append(f'{key} = "{cfg[key]}"')

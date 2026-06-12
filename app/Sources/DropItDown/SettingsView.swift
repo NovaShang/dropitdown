@@ -12,6 +12,7 @@ struct SettingsView: View {
     @State private var loadedFrom: AppConfig?
     @State private var saving = false
     @State private var savedFlash = false
+    @State private var agentMsg: String?
 
     var body: some View {
         ScrollView {
@@ -20,6 +21,7 @@ struct SettingsView: View {
                     foldersSection
                     behaviorSection
                     classificationSection
+                    agentSection
                     visionSection
                     advancedSection
                 } else if config.loading {
@@ -140,6 +142,58 @@ struct SettingsView: View {
                         isSet: loadedFrom?.hasAPIKey ?? false,
                         value: $draft.apiKey)
             helpText("Works with any OpenAI-compatible endpoint (DeepSeek, OpenAI, Claude proxies, …).")
+            FormRow(label: "Summary language") {
+                TextField("English", text: $draft.summaryLanguage)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 160)
+                Text("the language each note's one-line summary is written in")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var agentSection: some View {
+        SettingsGroup(title: "Use with your AI agent", systemImage: "bubbles.and.sparkles") {
+            Text("Your vault is plain Markdown any agent can read. Drop a CLAUDE.md into it so a Claude Code session opened there knows how to search your notes — or copy the same prompt to paste into any agent.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 10) {
+                Button {
+                    runAgent(write: true)
+                } label: {
+                    Label("Write CLAUDE.md to vault", systemImage: "doc.badge.gearshape")
+                }
+                Button {
+                    runAgent(write: false)
+                } label: {
+                    Label("Copy agent prompt", systemImage: "doc.on.clipboard")
+                }
+            }
+            if let agentMsg {
+                Text(agentMsg)
+                    .font(.caption)
+                    .foregroundStyle(.green)
+                    .transition(.opacity)
+            }
+        }
+    }
+
+    private func runAgent(write: Bool) {
+        Task {
+            let (out, code) = await config.runAgentSkill(write: write)
+            await MainActor.run {
+                if !write {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(out, forType: .string)
+                }
+                withAnimation { agentMsg = code == 0
+                    ? (write ? "Wrote CLAUDE.md into your vault." : "Agent prompt copied to the clipboard.")
+                    : "Couldn't \(write ? "write CLAUDE.md" : "copy the prompt") — see the vault path in Folders." }
+            }
+            try? await Task.sleep(nanoseconds: 2_600_000_000)
+            await MainActor.run { withAnimation { agentMsg = nil } }
         }
     }
 
@@ -270,6 +324,7 @@ struct ConfigDraft {
     var baseURL = ""
     var model = ""
     var apiKey = ""
+    var summaryLanguage = ""
     var cuEndpoint = ""
     var cuAnalyzerID = ""
     var cuAPIKey = ""
@@ -286,6 +341,7 @@ struct ConfigDraft {
         launchAtLogin = cfg.launchAtLogin
         baseURL = cfg.baseURL
         model = cfg.model
+        summaryLanguage = cfg.summaryLanguage
         cuEndpoint = cfg.cuEndpoint
         cuAnalyzerID = cfg.cuAnalyzerID
         cuFileTypes = cfg.cuFileTypes.joined(separator: ", ")
@@ -312,6 +368,7 @@ struct ConfigDraft {
         }
         add("base_url", baseURL, cfg.baseURL)
         add("model", model, cfg.model)
+        add("summary_language", summaryLanguage, cfg.summaryLanguage)
 
         add("cu_endpoint", cuEndpoint, cfg.cuEndpoint)
         add("cu_analyzer_id", cuAnalyzerID, cfg.cuAnalyzerID)
