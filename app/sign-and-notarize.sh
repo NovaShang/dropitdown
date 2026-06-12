@@ -88,7 +88,16 @@ xcrun stapler validate "$APP_BUNDLE"
 log "Building DMG"
 DMG="$APP_DIR/.build/DropItDown.dmg"
 rm -f "$DMG"
-hdiutil create -volname "DropItDown" -srcfolder "$APP_BUNDLE" -ov -format UDZO "$DMG"
+# Stage the (signed + stapled) app next to an /Applications alias so the
+# DMG offers the standard drag-to-install layout. ditto preserves the
+# bundle's signature and the stapled notarization ticket.
+DMG_STAGE="$APP_DIR/.build/dmg-stage"
+rm -rf "$DMG_STAGE"
+mkdir -p "$DMG_STAGE"
+ditto "$APP_BUNDLE" "$DMG_STAGE/DropItDown.app"
+ln -s /Applications "$DMG_STAGE/Applications"
+hdiutil create -volname "DropItDown" -srcfolder "$DMG_STAGE" -ov -format UDZO "$DMG"
+rm -rf "$DMG_STAGE"
 
 # Also sign the DMG for good measure.
 codesign --force --sign "$APPLE_DEV_ID" --timestamp "$DMG"
