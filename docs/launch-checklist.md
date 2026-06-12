@@ -35,7 +35,7 @@ Effort key: **S** ≤1h · **M** a few hours · **L** a day+
 
 - [x] **Bundle size — answer prepared** — README reframes ~400MB as the cost of a self-contained offline pipeline (nothing to install). Trimming to ~100MB stays an option, not done.
 - [x] **README refreshed** — BYOK/menu-bar reality, `agent-skill`, summary-language, copy-path. *(Site screenshots still stale — see below.)*
-- [ ] **Site: one-screen rewrite + fresh screenshots** — **M**. Lead with the token/agent hook; Download → DMG; BYOK + local + no-account. Screenshots (`screenshot-main.png`, `#ui`) are stale.
+- [x] **Site copy repositioned** — hero/how-it-works/features now lead with the token/agent hook; removed the stale "use-once-and-die / Dock / ~95MB" claims; added an "Agent-ready" feature. **Still pending: fresh screenshots** (`screenshot-main.png` is stale; blocked by the dropped screen-recording permission).
 - [x] **VERSION bump** — 0.3.0 → **0.4.0**. (Tagging `v0.4.0` to trigger the CI release is the user's call — not pushed.)
 
 ## Launch day (not dev)
